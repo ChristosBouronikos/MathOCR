@@ -58,6 +58,18 @@ def wait_until_ready(port: int, timeout: float = 30.0) -> None:
     raise RuntimeError("The local MathOCR engine did not start in time")
 
 
+def run_headless() -> None:
+    """Serve the API without a window (MATHOCR_HEADLESS=1).
+
+    Used to smoke-test the frozen application: recognition can be exercised
+    with plain HTTP requests, which catches packaging bugs (missing data
+    files, missing sources for TorchScript) that only appear when frozen.
+    """
+
+    port = int(os.getenv("MATHOCR_PORT", "8765"))
+    uvicorn.run(app, host=HOST, port=port, log_level="info")
+
+
 def run_desktop() -> None:
     """Start the local service, show the window, and stop cleanly on exit."""
 
@@ -98,7 +110,10 @@ def main() -> None:
     """Freeze-safe console entry point used by PyInstaller."""
 
     multiprocessing.freeze_support()
-    run_desktop()
+    if os.getenv("MATHOCR_HEADLESS") == "1":
+        run_headless()
+    else:
+        run_desktop()
 
 
 if __name__ == "__main__":

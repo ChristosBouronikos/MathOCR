@@ -45,14 +45,18 @@ model_store.configure_model_environment()
 
 # The desktop app has no visible console, so a log file next to the model
 # cache is the only way a user can hand us a traceback when something fails.
+# The handlers and level are attached to the "mathocr" logger directly (not
+# the root logger): pix2tex silences the root logger to FATAL when it loads,
+# which would otherwise swallow every error report after first recognition.
 _log_path = model_store.default_cache_root().parent / "logs" / "mathocr.log"
 _log_path.parent.mkdir(parents=True, exist_ok=True)
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s %(levelname)s %(name)s: %(message)s",
-    handlers=[logging.FileHandler(_log_path, encoding="utf-8"), logging.StreamHandler()],
-)
 logger = logging.getLogger("mathocr")
+logger.setLevel(logging.INFO)
+logger.propagate = False
+_log_format = logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s")
+for _handler in (logging.FileHandler(_log_path, encoding="utf-8"), logging.StreamHandler()):
+    _handler.setFormatter(_log_format)
+    logger.addHandler(_handler)
 
 from backend.engines import (  # noqa: E402  (environment must be configured first)
     ENGINE_LABELS,
@@ -127,7 +131,7 @@ def find_pandoc() -> str | None:
 app = FastAPI(
     title="MathOCR local API",
     description="Local image/PDF mathematics recognition and editable Word equation export.",
-    version="1.0.4",
+    version="1.0.5",
     contact={"name": AUTHOR, "email": AUTHOR_EMAIL, "url": DONATION_URL},
 )
 

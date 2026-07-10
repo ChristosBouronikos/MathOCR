@@ -5,7 +5,7 @@
 from pathlib import Path
 import sys
 
-from PyInstaller.utils.hooks import collect_all
+from PyInstaller.utils.hooks import collect_all, copy_metadata
 
 
 PROJECT_ROOT = Path(SPECPATH).parent.resolve()
@@ -20,6 +20,10 @@ PROJECT_ROOT = Path(SPECPATH).parent.resolve()
 datas = [(str(PROJECT_ROOT / "frontend"), "frontend")]
 binaries = []
 hiddenimports = ["pytesseract"]
+# transformers and optimum expose their submodules through lazy loading
+# (importlib at runtime, invisible to static analysis), so every submodule
+# must be collected explicitly or the frozen app dies with
+# "No module named 'transformers.models...'" when a model family is resolved.
 for package_name in (
     "pix2tex",
     "pix2text",
@@ -27,6 +31,8 @@ for package_name in (
     "cnstd",
     "cnocr",
     "rapidocr",
+    "transformers",
+    "optimum",
     "pypandoc",
     "pypdfium2",
 ):
@@ -40,9 +46,51 @@ for package_name in (
 # tesseract/ and it is bundled here; otherwise the app still ships and simply
 # reports that page-text recognition needs Tesseract installed. See
 # docs/DESKTOP_PACKAGING.md. Nougat is never bundled (non-commercial weights).
+# optimum (and transformers) decide which backends exist by probing package
+# versions through importlib.metadata at import time. Without the dist-info
+# records the frozen app would silently consider onnxruntime unavailable and
+# fail to load the Pix2Text MFR engine.
+for metadata_package in (
+    "optimum",
+    "transformers",
+    "onnxruntime",
+    "onnx",
+    "torch",
+    "tokenizers",
+    "huggingface-hub",
+    "numpy",
+    "pillow",
+):
+    try:
+        datas += copy_metadata(metadata_package)
+    except Exception:
+        pass  # not installed on this platform; the engine import guards handle it
+
 vendor_tesseract = PROJECT_ROOT / "packaging" / "vendor" / "tesseract"
 if vendor_tesseract.is_dir():
     datas.append((str(vendor_tesseract), "vendor/tesseract"))
+
+# Several recognition packages run ``@torch.jit.script`` at import time, and
+# TorchScript reads the original .py source through inspect.getsource(). By
+# default PyInstaller ships bytecode only, which made the packaged app fail
+# with "OSError: could not get source code" on the first recognition. Keeping
+# the real source files for the whole recognition stack fixes that (PyInstaller
+# does the same for torch itself in its bundled hook).
+MODULE_COLLECTION_MODE = {
+    # transformers' docstring decorators call inspect.getsource() on optimum's
+    # classes while ``optimum.onnxruntime`` is imported (pix2text MFR path);
+    # optimum has no PyInstaller hook, so its source must be kept explicitly.
+    "optimum": "pyz+py",
+    "timm": "pyz+py",            # jit-scripted activations, imported by pix2tex
+    "cnstd": "pyz+py",           # yolov7.torch_utils is jit-scripted (detector)
+    "cnocr": "pyz+py",
+    "pix2tex": "pyz+py",
+    "pix2text": "pyz+py",
+    "x_transformers": "pyz+py",  # pix2tex decoder
+    "einops": "pyz+py",          # torch-specific helpers are jit-compiled
+    "rapidocr": "pyz+py",
+    "rapid_latex_ocr": "pyz+py",
+}
 
 analysis = Analysis(
     [str(PROJECT_ROOT / "desktop" / "main.py")],
@@ -55,6 +103,7 @@ analysis = Analysis(
     runtime_hooks=[],
     excludes=[],
     noarchive=False,
+    module_collection_mode=MODULE_COLLECTION_MODE,
     optimize=0,
 )
 
@@ -96,7 +145,7 @@ if sys.platform == "darwin":
         info_plist={
             "CFBundleDisplayName": "MathOCR",
             "CFBundleName": "MathOCR",
-            "CFBundleShortVersionString": "1.0.4",
+            "CFBundleShortVersionString": "1.0.5",
             "NSHighResolutionCapable": True,
             "NSHumanReadableCopyright": "Copyright © 2026 Bouronikos Christos",
         },

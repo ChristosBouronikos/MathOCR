@@ -51,7 +51,9 @@ from backend.latex import (
     tokenize,
 )
 
-logger = logging.getLogger(__name__)
+# Child of the "mathocr" logger so engine failures reach the app's log file
+# and stderr even after pix2tex silences the root logger at load time.
+logger = logging.getLogger("mathocr.engines")
 
 # Reliability priors from side-by-side runs on printed formulas: MFR-1.5 is
 # markedly stronger on large fractions, matrices, and long expressions.
@@ -443,15 +445,17 @@ class EngineRegistry:
         """Instantiate the math engines named by a UI selection (``auto`` = all)."""
 
         engines: list[FormulaEngine] = []
+        failures: list[str] = []
         for engine_id in resolve_math_engines(selection):
             try:
                 engines.append(self.engine(engine_id))
             except Exception as error:  # a broken optional engine must not sink the request
-                logger.warning("Engine %s unavailable: %s", engine_id, error)
+                # Full traceback to the log; a short reason for the error message.
+                logger.warning("Engine %s unavailable", engine_id, exc_info=True)
+                failures.append(f"{engine_id}: {type(error).__name__}: {error}")
         if not engines:
             raise RuntimeError(
-                "No recognition engine could be loaded; "
-                "run: pip install -r backend/requirements.txt"
+                "No recognition engine could be loaded — " + " | ".join(failures)
             )
         return engines
 

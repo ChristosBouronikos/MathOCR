@@ -35,6 +35,7 @@ import os
 import shutil
 import sys
 import threading
+import time
 from dataclasses import dataclass, field
 from statistics import median
 from typing import Protocol
@@ -417,16 +418,26 @@ class EngineRegistry:
     def engine(self, engine_id: str) -> FormulaEngine:
         with self._lock:
             if engine_id not in self._engines:
+                started = time.perf_counter()
+                logger.info("Loading recognition engine | engine=%s", engine_id)
                 if engine_id == "pix2text-mfr":
                     self._engines[engine_id] = Pix2TextMfrEngine(self._device)
                 else:
                     self._engines[engine_id] = _ENGINE_CLASSES[engine_id]()
+                logger.info(
+                    "Recognition engine loaded | engine=%s | elapsed=%.2fs",
+                    engine_id,
+                    time.perf_counter() - started,
+                )
             return self._engines[engine_id]
 
     def detector(self) -> MathDetector:
         with self._lock:
             if self._detector is None:
+                started = time.perf_counter()
+                logger.info("Loading math-region detector")
                 self._detector = MathDetector(self._device)
+                logger.info("Math-region detector loaded | elapsed=%.2fs", time.perf_counter() - started)
             return self._detector
 
     def text_engine(self) -> TesseractTextEngine:
@@ -669,7 +680,15 @@ class MathPipeline:
             return self._assemble_document(image, regions)
 
     def _recognize_page_math(self, image: Image.Image, mode: str, engine: str) -> list[RegionResult]:
+        started = time.perf_counter()
         detected = self._registry.detector().detect(image)
+        logger.info(
+            "Math detection timing | image=%sx%s | detections=%s | elapsed=%.2fs",
+            image.width,
+            image.height,
+            len(detected),
+            time.perf_counter() - started,
+        )
         boxes = [box for box, _category in detected]
         regions = plan_regions(image.width, image.height, boxes, assume_small_is_formula=True)
         if regions is None:
@@ -734,6 +753,7 @@ class MathPipeline:
         return "embedded" if kinds and kinds <= {"embedded"} else "isolated"
 
     def _recognize_region(self, image: Image.Image, engine: str, kind: str) -> RegionResult:
+        started = time.perf_counter()
         engines = self._registry.select_engines(engine)
 
         candidates: list[Candidate] = []
@@ -746,7 +766,20 @@ class MathPipeline:
         try:
             winner, confidence, alternatives = vote(candidates)
         except ValueError:
+            logger.info(
+                "Formula recognition timing | kind=%s | engines=%s | candidates=0 | elapsed=%.2fs",
+                kind,
+                ",".join(math_engine.id for math_engine in engines),
+                time.perf_counter() - started,
+            )
             return RegionResult(latex="", engine="none", confidence=None, kind=kind)
+        logger.info(
+            "Formula recognition timing | kind=%s | engines=%s | candidates=%s | elapsed=%.2fs",
+            kind,
+            ",".join(math_engine.id for math_engine in engines),
+            len(candidates),
+            time.perf_counter() - started,
+        )
         return RegionResult(
             latex=winner.latex,
             engine=winner.engine,

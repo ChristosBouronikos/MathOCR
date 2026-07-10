@@ -23,6 +23,7 @@ import subprocess
 import sys
 import tempfile
 import threading
+import time
 import urllib.request
 from pathlib import Path
 from typing import Annotated, Literal
@@ -30,7 +31,7 @@ from typing import Annotated, Literal
 import pypdfium2 as pdfium
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from PIL import Image, ImageOps, UnidentifiedImageError
 from pydantic import BaseModel, Field, field_validator
@@ -131,7 +132,7 @@ def find_pandoc() -> str | None:
 app = FastAPI(
     title="MathOCR local API",
     description="Local image/PDF mathematics recognition and editable Word equation export.",
-    version="1.0.5",
+    version="1.0.6",
     contact={"name": AUTHOR, "email": AUTHOR_EMAIL, "url": DONATION_URL},
 )
 
@@ -199,6 +200,9 @@ class DocxRequest(BaseModel):
     title: str = Field(default="MathOCR equations", max_length=120)
     equations: list[str] = Field(default_factory=list, max_length=500)
     markdown: str | None = Field(default=None, max_length=200_000)
+    # When true the file is written straight into the user's Downloads folder
+    # (desktop app) instead of streamed back for the browser to save.
+    save_to_downloads: bool = False
 
     @field_validator("equations")
     @classmethod
@@ -220,6 +224,14 @@ class DocxRequest(BaseModel):
     def require_content(self) -> None:
         if not self.equations and not (self.markdown and self.markdown.strip()):
             raise ValueError("Provide equations or markdown to export")
+
+
+class TextExportRequest(BaseModel):
+    """Plain-text export (e.g. LaTeX .tex) saved into the Downloads folder."""
+
+    title: str = Field(default="MathOCR", max_length=120)
+    extension: str = Field(default="txt", max_length=8)
+    content: str = Field(default="", max_length=2_000_000)
 
 
 class EngineStorage(BaseModel):
@@ -339,55 +351,74 @@ def recognize_file(
 ) -> tuple[list[EquationResult], list[DocumentResult], list[str]]:
     """Run one validated file through the recognition pipeline."""
 
-    is_pdf = filename.lower().endswith(".pdf")
+    started = time.perf_counter()
+    pages_processed = 0
+    pages_total = 0
     warnings: list[str] = []
-    if is_pdf:
-        pages, truncated = pdf_pages(data, page_limit)
-        if truncated:
-            warnings.append(f"{filename}: only the first {page_limit} pages were processed")
-    else:
-        pages = [(1, normalized_image(data))]
-
     results: list[EquationResult] = []
     documents: list[DocumentResult] = []
     text_missing = False
-    for page_number, image in pages:
-        try:
-            outcome = pipeline.process(image, mode, engine, doc_engine)
-        finally:
-            image.close()
-        page_ref = page_number if is_pdf else None
-        for region in outcome.regions:
-            if not region.latex:
-                continue
-            results.append(
-                EquationResult(
-                    source=filename,
-                    page=page_ref,
-                    latex=region.latex,
-                    confidence=region.confidence,
-                    engine=region.engine,
-                    kind=region.kind,
-                    region=region.box,
-                    alternatives=[
-                        AlternativeReading(engine=alternative.engine, latex=alternative.latex)
-                        for alternative in region.alternatives
-                    ],
-                )
-            )
-        if outcome.markdown:
-            documents.append(
-                DocumentResult(source=filename, page=page_ref, markdown=outcome.markdown)
-            )
-        if mode == "document" and not outcome.text_available:
-            text_missing = True
+    try:
+        is_pdf = filename.lower().endswith(".pdf")
+        if is_pdf:
+            pages, truncated = pdf_pages(data, page_limit)
+            if truncated:
+                warnings.append(f"{filename}: only the first {page_limit} pages were processed")
+        else:
+            pages = [(1, normalized_image(data))]
+        pages_total = len(pages)
 
-    if text_missing:
-        warnings.append(
-            f"{filename}: page text could not be read (Tesseract not available); "
-            "only equations were extracted"
+        for page_number, image in pages:
+            try:
+                outcome = pipeline.process(image, mode, engine, doc_engine)
+                pages_processed += 1
+            finally:
+                image.close()
+            page_ref = page_number if is_pdf else None
+            for region in outcome.regions:
+                if not region.latex:
+                    continue
+                results.append(
+                    EquationResult(
+                        source=filename,
+                        page=page_ref,
+                        latex=region.latex,
+                        confidence=region.confidence,
+                        engine=region.engine,
+                        kind=region.kind,
+                        region=region.box,
+                        alternatives=[
+                            AlternativeReading(engine=alternative.engine, latex=alternative.latex)
+                            for alternative in region.alternatives
+                        ],
+                    )
+                )
+            if outcome.markdown:
+                documents.append(
+                    DocumentResult(source=filename, page=page_ref, markdown=outcome.markdown)
+                )
+            if mode == "document" and not outcome.text_available:
+                text_missing = True
+
+        if text_missing:
+            warnings.append(
+                f"{filename}: page text could not be read (Tesseract not available); "
+                "only equations were extracted"
+            )
+        return results, documents, warnings
+    finally:
+        logger.info(
+            "OCR file timing | file=%s | mode=%s | engine=%s | pages=%s/%s | "
+            "equations=%s | documents=%s | elapsed=%.2fs",
+            filename,
+            mode,
+            engine,
+            pages_processed,
+            pages_total,
+            len(results),
+            len(documents),
+            time.perf_counter() - started,
         )
-    return results, documents, warnings
 
 
 @app.post("/api/ocr", response_model=OcrResponse)
@@ -410,6 +441,7 @@ async def ocr(
     if not files or len(files) > MAX_FILES:
         raise HTTPException(status_code=400, detail=f"Upload between 1 and {MAX_FILES} files")
 
+    started = time.perf_counter()
     uploads = [await read_upload(upload) for upload in files]
     results: list[EquationResult] = []
     documents: list[DocumentResult] = []
@@ -434,6 +466,17 @@ async def ocr(
         raise HTTPException(
             status_code=500, detail=f"Recognition failed: {type(exc).__name__}: {exc}"
         ) from exc
+    finally:
+        logger.info(
+            "OCR request timing | files=%s | mode=%s | engine=%s | equations=%s | "
+            "documents=%s | elapsed=%.2fs",
+            len(uploads),
+            mode,
+            engine,
+            len(results),
+            len(documents),
+            time.perf_counter() - started,
+        )
     return OcrResponse(results=results, documents=documents, warnings=warnings)
 
 
@@ -804,15 +847,67 @@ def export_filename(title: str, extension: str) -> str:
     return f"{base[:80]} {FILENAME_SUFFIX}.{extension}"
 
 
+def downloads_dir() -> Path:
+    """The user's Downloads folder — the default save location for every export.
+
+    Works the same on macOS and Windows (``~/Downloads``); if it cannot be
+    created the home directory is used as a safe fallback.
+    """
+
+    target = Path.home() / "Downloads"
+    try:
+        target.mkdir(parents=True, exist_ok=True)
+    except OSError:
+        return Path.home()
+    return target
+
+
+def unique_destination(directory: Path, filename: str) -> Path:
+    """Return a path in ``directory`` that will not overwrite an existing file.
+
+    Mirrors the browser's behaviour of appending " (2)", " (3)", … on clashes.
+    """
+
+    candidate = directory / filename
+    if not candidate.exists():
+        return candidate
+    stem, suffix = candidate.stem, candidate.suffix
+    for index in range(2, 1000):
+        alternative = directory / f"{stem} ({index}){suffix}"
+        if not alternative.exists():
+            return alternative
+    return candidate  # after 1000 clashes, just overwrite
+
+
 def remove_tree(path: str) -> None:
     """Delete only the private temporary directory created for one export."""
 
     shutil.rmtree(path, ignore_errors=True)
 
 
-@app.post("/api/export/docx")
-async def export_docx(request: DocxRequest) -> FileResponse:
-    """Convert reviewed TeX to a Word document containing editable OMML equations."""
+@app.post("/api/export/text")
+def export_text(request: TextExportRequest) -> JSONResponse:
+    """Save plain text (LaTeX, etc.) into the Downloads folder, crediting the author."""
+
+    if not request.content.strip():
+        raise HTTPException(status_code=422, detail="There is nothing to save")
+    extension = re.sub(r"[^A-Za-z0-9]", "", request.extension) or "txt"
+    destination = unique_destination(downloads_dir(), export_filename(request.title, extension))
+    try:
+        destination.write_text(request.content, encoding="utf-8")
+    except OSError as exc:
+        logger.exception("Text export failed")
+        raise HTTPException(status_code=500, detail=f"Could not save the file: {exc}") from exc
+    return JSONResponse({"saved": True, "path": str(destination), "filename": destination.name})
+
+
+@app.post("/api/export/docx", response_model=None)
+async def export_docx(request: DocxRequest) -> FileResponse | JSONResponse:
+    """Convert reviewed TeX to a Word document containing editable OMML equations.
+
+    In the desktop app (``save_to_downloads``) the file lands in Downloads and
+    the JSON reply reports its path; otherwise it is streamed for the browser.
+    """
 
     try:
         request.require_content()
@@ -854,10 +949,22 @@ async def export_docx(request: DocxRequest) -> FileResponse:
         detail = completed.stderr.strip()[-600:] or "Pandoc did not create a document"
         raise HTTPException(status_code=422, detail=f"Word export failed: {detail}")
 
+    filename = export_filename(request.title, "docx")
+    if request.save_to_downloads:
+        # Desktop path: drop the file straight into Downloads and report where.
+        destination = unique_destination(downloads_dir(), filename)
+        try:
+            shutil.move(str(output_path), str(destination))
+        finally:
+            remove_tree(temp_dir)
+        return JSONResponse(
+            {"saved": True, "path": str(destination), "filename": destination.name}
+        )
+
     return FileResponse(
         output_path,
         media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-        filename=export_filename(request.title, "docx"),
+        filename=filename,
         background=BackgroundTask(remove_tree, temp_dir),
     )
 

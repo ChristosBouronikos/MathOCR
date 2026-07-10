@@ -13,7 +13,7 @@ import pytest
 from fastapi.testclient import TestClient
 from PIL import Image
 
-from backend import model_store
+from backend import __version__, model_store
 from backend.app import (
     DocxRequest,
     app,
@@ -28,6 +28,48 @@ from backend.app import (
 from backend.engines import resolve_math_engines
 
 client = TestClient(app)
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+
+
+def test_release_version_surfaces_are_consistent() -> None:
+    frontend = (PROJECT_ROOT / "frontend" / "app.js").read_text(encoding="utf-8")
+    macos_spec = (PROJECT_ROOT / "packaging" / "MathOCR.spec").read_text(encoding="utf-8")
+    windows_installer = (
+        PROJECT_ROOT / "packaging" / "windows" / "MathOCR.iss"
+    ).read_text(encoding="utf-8")
+
+    assert __version__ == app.version == "1.0.6"
+    assert 'const APP_VERSION = "1.0.6";' in frontend
+    assert '"CFBundleShortVersionString": "1.0.6"' in macos_spec
+    assert '#define MyAppVersion "1.0.6"' in windows_installer
+
+
+def test_release_ui_uses_fast_default_and_wires_manual_update_check() -> None:
+    frontend = (PROJECT_ROOT / "frontend" / "app.js").read_text(encoding="utf-8")
+    page = (PROJECT_ROOT / "frontend" / "index.html").read_text(encoding="utf-8")
+
+    assert '<option value="pix2text-mfr" selected' in page
+    assert '<option value="auto"' in page
+    assert 'id="checkUpdatesButton"' in page
+    assert 'checkUpdatesButton.addEventListener("click", () => checkUpdate(true))' in frontend
+    assert 'id="ensembleAdvice"' in page
+    assert 'processingFirstRun' in frontend
+    assert 'processingStillWorking' in frontend
+
+
+def test_desktop_icon_assets_are_present_and_packaged() -> None:
+    spec = (PROJECT_ROOT / "packaging" / "MathOCR.spec").read_text(encoding="utf-8")
+    installer = (PROJECT_ROOT / "packaging" / "windows" / "MathOCR.iss").read_text(
+        encoding="utf-8"
+    )
+
+    for name in ("MathOCR.ico", "MathOCR.icns", "icon-1024.png"):
+        asset = PROJECT_ROOT / "packaging" / name
+        assert asset.is_file()
+        assert asset.stat().st_size > 0
+    assert 'WINDOWS_ICON = PROJECT_ROOT / "packaging" / "MathOCR.ico"' in spec
+    assert 'MACOS_ICON = PROJECT_ROOT / "packaging" / "MathOCR.icns"' in spec
+    assert "SetupIconFile=packaging\\MathOCR.ico" in installer
 
 
 def test_health_does_not_load_models() -> None:
@@ -220,6 +262,57 @@ def test_docx_export_contains_native_word_equation_markup() -> None:
     with zipfile.ZipFile(io.BytesIO(response.content)) as archive:
         document_xml = archive.read("word/document.xml")
     assert b"m:oMath" in document_xml
+
+
+def test_export_text_saves_into_downloads(monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
+    import backend.app as app_module
+
+    monkeypatch.setattr(app_module.Path, "home", staticmethod(lambda: tmp_path))
+    response = client.post(
+        "/api/export/text",
+        json={"title": "Εξισώσεις", "extension": "tex", "content": "\\documentclass{article}"},
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["saved"] is True
+    saved = Path(payload["path"])
+    assert saved.parent == tmp_path / "Downloads"
+    assert saved.name.endswith("by Bouronikos Christos.tex")
+    assert saved.read_text(encoding="utf-8") == "\\documentclass{article}"
+
+
+def test_export_text_rejects_empty_content(monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
+    import backend.app as app_module
+
+    monkeypatch.setattr(app_module.Path, "home", staticmethod(lambda: tmp_path))
+    response = client.post("/api/export/text", json={"title": "x", "content": "   "})
+    assert response.status_code == 422
+
+
+def test_unique_destination_avoids_overwrite(tmp_path) -> None:
+    from backend.app import unique_destination
+
+    (tmp_path / "note.txt").write_text("first", encoding="utf-8")
+    second = unique_destination(tmp_path, "note.txt")
+    assert second.name == "note (2).txt"
+
+
+@pytest.mark.skipif(shutil.which("pandoc") is None, reason="Pandoc is not installed")
+def test_docx_export_can_save_to_downloads(monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
+    import backend.app as app_module
+
+    monkeypatch.setattr(app_module.Path, "home", staticmethod(lambda: tmp_path))
+    response = client.post(
+        "/api/export/docx",
+        json={"title": "Doc", "equations": [r"x^2"], "save_to_downloads": True},
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["saved"] is True
+    saved = Path(payload["path"])
+    assert saved.parent == tmp_path / "Downloads"
+    assert saved.name.endswith("by Bouronikos Christos.docx")
+    assert saved.is_file()
 
 
 def test_parse_version_and_is_newer() -> None:

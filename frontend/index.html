@@ -17,9 +17,9 @@
     <meta name="theme-color" content="#f5f1e8" />
     <title>MathOCR by Bouronikos Christos</title>
     <link rel="stylesheet" href="./vendor/katex/katex.min.css" />
-    <link rel="stylesheet" href="./styles.css?v=1.0.5" />
+    <link rel="stylesheet" href="./styles.css?v=1.0.6" />
     <script defer src="./vendor/katex/katex.min.js"></script>
-    <script defer src="./app.js?v=1.0.5"></script>
+    <script defer src="./app.js?v=1.0.6"></script>
   </head>
   <body>
     <header class="site-header">
@@ -104,8 +104,8 @@
           <label class="field">
             <span data-i18n="mathEngine">Math engine</span>
             <select id="mathEngine">
-              <option value="auto" selected data-i18n="engineBest">Best — cross-check all (recommended)</option>
-              <option value="pix2text-mfr" data-i18n="enginePix2text">Pix2Text MFR-1.5</option>
+              <option value="pix2text-mfr" selected data-i18n="enginePix2text">MFR-1.5 — fast (recommended)</option>
+              <option value="auto" data-i18n="engineBest">Cross-check all engines (slower)</option>
               <option value="pix2tex" data-i18n="enginePix2tex">pix2tex (LaTeX-OCR)</option>
               <option value="rapid-latex" data-i18n="engineRapid">RapidLaTeXOCR</option>
             </select>
@@ -140,8 +140,8 @@
 
       <section class="progress-panel" id="progressPanel" hidden aria-live="polite">
         <div class="progress-copy">
-          <strong data-i18n="readingMath">Reading mathematics…</strong>
-          <span data-i18n="processingNote">Processing can take several minutes depending on file size and model availability.</span>
+          <strong id="progressTitle" data-i18n="readingMath">Reading mathematics…</strong>
+          <span id="processingNote" data-i18n="processingNote">The first run loads the model into memory and can take a minute or two; later runs are much faster.</span>
         </div>
         <div class="progress-track"><span></span></div>
       </section>
@@ -172,6 +172,10 @@
             <button class="primary-button word-button" id="downloadWordButton" type="button" data-i18n="downloadWord">Download Word</button>
           </div>
         </div>
+        <aside class="ensemble-advice" id="ensembleAdvice" hidden role="note">
+          <strong data-i18n="ensembleAdviceTitle">Want a second opinion?</strong>
+          <span data-i18n="ensembleAdvice">If the result is not satisfactory, select “Cross-check all engines” and recognize the file again.</span>
+        </aside>
         <div class="result-list" id="resultList"></div>
       </section>
 
@@ -224,7 +228,10 @@
       </div>
       <div class="footer-legal">
         <span>© 2026 Bouronikos Christos · <span data-i18n="footerLicense">MIT License</span></span>
-        <span>MathOCR <span id="footerVersion">1.0.5</span> · <span data-i18n="footerMadeWith">made for students, teachers, and researchers</span></span>
+        <span>
+          MathOCR <span id="footerVersion">1.0.6</span> ·
+          <button class="link-button" id="checkUpdatesButton" type="button" data-i18n="checkUpdates">Check for updates</button>
+        </span>
       </div>
     </footer>
 

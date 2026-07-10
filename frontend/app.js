@@ -10,11 +10,10 @@
 
 "use strict";
 
-const APP_VERSION = "1.0.0";
+const APP_VERSION = "1.0.6";
 const MAX_FILE_BYTES = 25 * 1024 * 1024;
 const MAX_FILES = 12;
 const RELEASES_URL = "https://github.com/ChristosBouronikos/MathOCR/releases/latest";
-const AUTHOR_SUFFIX = "by Bouronikos Christos"; // every exported file ends with this
 const ENGINE_SHORT_NAMES = {
   "pix2text-mfr": "Pix2Text MFR",
   pix2tex: "pix2tex",
@@ -34,6 +33,10 @@ const translations = {
     updateStartedWin: "Installer launched. MathOCR will now close to finish updating.",
     updateStartedMac: "Update downloaded to your Downloads folder. Drag MathOCR into Applications to replace the old version, then reopen it.",
     updateFailed: "The update could not be downloaded — try again or download it from GitHub.",
+    checkUpdates: "Check for updates",
+    checkingUpdates: "Checking for updates…",
+    upToDate: "You have the latest version ({{version}}).",
+    updateCheckFailed: "Could not check for updates — check your connection.",
     serviceChecking: "Checking engine…",
     serviceReady: "Local engine ready",
     serviceNoPandoc: "OCR ready · Pandoc missing",
@@ -51,8 +54,8 @@ const translations = {
     modeMixed: "Only the math inside a page of text",
     modeFormula: "Only one equation (cropped image)",
     mathEngine: "Math engine",
-    engineBest: "Best — cross-check all (recommended)",
-    enginePix2text: "Pix2Text MFR-1.5",
+    engineBest: "Cross-check all engines (slower)",
+    enginePix2text: "MFR-1.5 — fast (recommended)",
     enginePix2tex: "pix2tex (LaTeX-OCR)",
     engineRapid: "RapidLaTeXOCR",
     docReader: "Text reader (document mode)",
@@ -68,7 +71,11 @@ const translations = {
     installPandoc: "OCR works, but Pandoc is required for Word export.",
     startEngine: "Start the local engine to enable recognition and Word export.",
     readingMath: "Reading mathematics…",
-    processingNote: "Processing can take several minutes depending on file size and model availability.",
+    processingNote: "The first run loads the model into memory and can take a minute or two; later runs are much faster.",
+    loadingModel: "Preparing your first recognition…",
+    processingFirstRun: "Loading models if needed · {{elapsed}} elapsed. The first run can take a minute or two.",
+    processingElapsed: "Recognizing mathematics · {{elapsed}} elapsed. Keep MathOCR open while it works.",
+    processingStillWorking: "Still recognizing · {{elapsed}} elapsed. Large pages and cross-checking take longer.",
     reconstructedDocument: "Reconstructed document",
     documentHint: "Edit the text and math below, then export the whole document to Word.",
     copyDocument: "Copy text",
@@ -81,6 +88,8 @@ const translations = {
     resultsMany: "{{count}} equations found. Edit the LaTeX and the preview updates live.",
     noEquationsDetected: "No equations were detected. Try a clearer image, or the “One cropped equation” mode.",
     reviewReminder: "OCR can make convincing mistakes — always compare with the source.",
+    ensembleAdviceTitle: "Want a second opinion?",
+    ensembleAdvice: "If the result is not satisfactory, select “Cross-check all engines” and recognize the file again.",
     copyAll: "Copy all LaTeX",
     downloadTex: "Download .tex",
     downloadWord: "Download Word",
@@ -98,6 +107,7 @@ const translations = {
     buildingWord: "Building Word…",
     wordFailed: "Word export failed",
     wordCreated: "Editable Word document created",
+    savedTo: "Saved to {{path}}",
     texTitle: "MathOCR equations",
     unsupportedFile: "{{name}}: unsupported file type",
     fileTooLarge: "{{name}}: file is larger than 25 MB",
@@ -161,6 +171,10 @@ const translations = {
     updateStartedWin: "Ο εγκαταστάτης ξεκίνησε. Το MathOCR θα κλείσει τώρα για να ολοκληρωθεί η ενημέρωση.",
     updateStartedMac: "Η ενημέρωση κατέβηκε στον φάκελο Λήψεις. Σύρετε το MathOCR στις Εφαρμογές για να αντικαταστήσετε την παλιά έκδοση και ανοίξτε το ξανά.",
     updateFailed: "Η ενημέρωση δεν κατέβηκε — δοκιμάστε ξανά ή κατεβάστε την από το GitHub.",
+    checkUpdates: "Έλεγχος για ενημερώσεις",
+    checkingUpdates: "Έλεγχος για ενημερώσεις…",
+    upToDate: "Έχετε την τελευταία έκδοση ({{version}}).",
+    updateCheckFailed: "Δεν ήταν δυνατός ο έλεγχος ενημερώσεων — ελέγξτε τη σύνδεσή σας.",
     serviceChecking: "Έλεγχος μηχανής…",
     serviceReady: "Η τοπική μηχανή είναι έτοιμη",
     serviceNoPandoc: "OCR έτοιμο · λείπει το Pandoc",
@@ -178,8 +192,8 @@ const translations = {
     modeMixed: "Μόνο τα μαθηματικά μέσα σε σελίδα με κείμενο",
     modeFormula: "Μόνο μία εξίσωση (κομμένη εικόνα)",
     mathEngine: "Μηχανή μαθηματικών",
-    engineBest: "Βέλτιστη — διασταύρωση όλων (προτείνεται)",
-    enginePix2text: "Pix2Text MFR-1.5",
+    engineBest: "Διασταύρωση όλων των μηχανών (πιο αργό)",
+    enginePix2text: "MFR-1.5 — γρήγορο (προτείνεται)",
     enginePix2tex: "pix2tex (LaTeX-OCR)",
     engineRapid: "RapidLaTeXOCR",
     docReader: "Ανάγνωση κειμένου (λειτουργία εγγράφου)",
@@ -195,7 +209,11 @@ const translations = {
     installPandoc: "Το OCR λειτουργεί, αλλά για εξαγωγή Word απαιτείται το Pandoc.",
     startEngine: "Εκκινήστε την τοπική μηχανή για αναγνώριση και εξαγωγή Word.",
     readingMath: "Ανάγνωση μαθηματικών…",
-    processingNote: "Η επεξεργασία μπορεί να διαρκέσει αρκετά λεπτά ανάλογα με το μέγεθος του αρχείου και τη διαθεσιμότητα των μοντέλων.",
+    processingNote: "Η πρώτη εκτέλεση φορτώνει το μοντέλο στη μνήμη και μπορεί να πάρει ένα-δύο λεπτά· οι επόμενες είναι πολύ πιο γρήγορες.",
+    loadingModel: "Προετοιμασία πρώτης αναγνώρισης…",
+    processingFirstRun: "Φόρτωση μοντέλων αν χρειάζεται · {{elapsed}}. Η πρώτη εκτέλεση μπορεί να πάρει ένα-δύο λεπτά.",
+    processingElapsed: "Αναγνώριση μαθηματικών · {{elapsed}}. Κρατήστε το MathOCR ανοικτό όσο λειτουργεί.",
+    processingStillWorking: "Η αναγνώριση συνεχίζεται · {{elapsed}}. Οι μεγάλες σελίδες και η διασταύρωση χρειάζονται περισσότερο χρόνο.",
     reconstructedDocument: "Ανακατασκευασμένο έγγραφο",
     documentHint: "Επεξεργαστείτε το κείμενο και τα μαθηματικά και εξαγάγετε όλο το έγγραφο σε Word.",
     copyDocument: "Αντιγραφή κειμένου",
@@ -208,6 +226,8 @@ const translations = {
     resultsMany: "Βρέθηκαν {{count}} εξισώσεις. Επεξεργαστείτε το LaTeX και η προεπισκόπηση ενημερώνεται άμεσα.",
     noEquationsDetected: "Δεν εντοπίστηκαν εξισώσεις. Δοκιμάστε καθαρότερη εικόνα ή τη λειτουργία «Μία εξίσωση».",
     reviewReminder: "Το OCR μπορεί να κάνει πειστικά λάθη — συγκρίνετε πάντα με το πρωτότυπο.",
+    ensembleAdviceTitle: "Θέλετε μια δεύτερη γνώμη;",
+    ensembleAdvice: "Αν το αποτέλεσμα δεν σας ικανοποιεί, επιλέξτε «Διασταύρωση όλων των μηχανών» και αναγνωρίστε ξανά το αρχείο.",
     copyAll: "Αντιγραφή όλου του LaTeX",
     downloadTex: "Λήψη .tex",
     downloadWord: "Λήψη Word",
@@ -225,6 +245,7 @@ const translations = {
     buildingWord: "Δημιουργία Word…",
     wordFailed: "Η εξαγωγή Word απέτυχε",
     wordCreated: "Το επεξεργάσιμο έγγραφο Word δημιουργήθηκε",
+    savedTo: "Αποθηκεύτηκε στο {{path}}",
     texTitle: "Εξισώσεις MathOCR",
     unsupportedFile: "{{name}}: μη υποστηριζόμενος τύπος αρχείου",
     fileTooLarge: "{{name}}: το αρχείο ξεπερνά τα 25 MB",
@@ -294,6 +315,9 @@ const state = {
   nougatReady: false,
   nougatInstallable: false,
   busy: false,
+  recognitionStartedAt: null,
+  recognitionTimer: null,
+  hasCompletedRecognition: false,
   language: initialLanguage,
   storage: null,
   update: null,
@@ -312,11 +336,11 @@ for (const id of [
   "apiUrl", "connectionHelp", "copyAllButton", "copyDocButton", "deleteAllModelsButton",
   "downloadModelsButton", "downloadDocWordButton", "downloadTexButton", "downloadWordButton",
   "dropZone", "engineBanner", "engineBannerLink", "advancedSettings", "docEngine", "docEngineField",
-  "documentList", "documentSection", "fileInput", "fileList", "footerVersion", "mathEngine",
+  "documentList", "documentSection", "ensembleAdvice", "fileInput", "fileList", "footerVersion", "mathEngine",
   "pageLimit", "progressPanel", "recognitionMode", "recognizeButton", "recheckButton", "refreshPageButton",
-  "resultList", "resultsSection", "resultsSummary", "servicePill", "serviceText", "storageList",
+  "progressTitle", "processingNote", "resultList", "resultsSection", "resultsSummary", "servicePill", "serviceText", "storageList",
   "storagePathValue", "storageSection", "storageTotalBytes", "toast",
-  "updateBanner", "updateButton", "updateDetail", "updateNotesLink",
+  "updateBanner", "updateButton", "updateDetail", "updateNotesLink", "checkUpdatesButton",
 ]) {
   elements[id] = document.querySelector(`#${id}`);
 }
@@ -341,6 +365,7 @@ function applyLanguage(language) {
   renderUpdateBanner();
   if (!elements.documentSection.hidden) renderDocuments();
   if (!elements.resultsSection.hidden) renderResults(false);
+  if (state.busy) updateRecognitionProgress();
 }
 
 /* ---------- helpers ---------- */
@@ -368,6 +393,41 @@ function updateControls() {
   elements.recognizeButton.disabled = !state.online || !state.files.length || state.busy;
   elements.fileInput.disabled = state.busy;
   elements.apiUrl.disabled = state.busy;
+}
+
+function formatElapsed(seconds) {
+  const minutes = Math.floor(seconds / 60);
+  return `${minutes}:${String(seconds % 60).padStart(2, "0")}`;
+}
+
+function updateRecognitionProgress() {
+  if (state.recognitionStartedAt == null) return;
+  const elapsedSeconds = Math.floor((Date.now() - state.recognitionStartedAt) / 1000);
+  const elapsed = formatElapsed(Math.max(0, elapsedSeconds));
+
+  if (!state.hasCompletedRecognition) {
+    elements.progressTitle.textContent = t("loadingModel");
+    elements.processingNote.textContent = t("processingFirstRun", { elapsed });
+  } else if (elapsedSeconds >= 45) {
+    elements.progressTitle.textContent = t("readingMath");
+    elements.processingNote.textContent = t("processingStillWorking", { elapsed });
+  } else {
+    elements.progressTitle.textContent = t("readingMath");
+    elements.processingNote.textContent = t("processingElapsed", { elapsed });
+  }
+}
+
+function startRecognitionProgress() {
+  stopRecognitionProgress();
+  state.recognitionStartedAt = Date.now();
+  updateRecognitionProgress();
+  state.recognitionTimer = setInterval(updateRecognitionProgress, 1000);
+}
+
+function stopRecognitionProgress() {
+  if (state.recognitionTimer != null) clearInterval(state.recognitionTimer);
+  state.recognitionTimer = null;
+  state.recognitionStartedAt = null;
 }
 
 /* ---------- engine status ---------- */
@@ -417,17 +477,24 @@ async function checkService() {
 
 /* ---------- in-app updates ---------- */
 
-async function checkUpdate() {
+async function checkUpdate(manual = false) {
+  // ``manual`` = triggered by the button, so we give explicit feedback (a
+  // "you're up to date" toast). The automatic startup check stays silent.
+  if (manual) showToast(t("checkingUpdates"));
   try {
     const response = await fetch(`${normalizedApiUrl()}/api/update/check`, {
       signal: AbortSignal.timeout(9000),
     });
-    if (!response.ok) return; // offline or rate-limited: stay quiet
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
     state.update = await response.json();
   } catch (_error) {
+    if (manual) showToast(t("updateCheckFailed"));
     return; // never let an update check disrupt normal use
   }
   renderUpdateBanner();
+  if (manual && !(state.update && state.update.update_available)) {
+    showToast(t("upToDate", { version: state.update ? state.update.current : "" }));
+  }
 }
 
 function renderUpdateBanner() {
@@ -535,6 +602,7 @@ async function recognize() {
   state.busy = true;
   updateControls();
   elements.progressPanel.hidden = false;
+  startRecognitionProgress();
   elements.progressPanel.scrollIntoView({ behavior: "smooth", block: "center" });
 
   const body = new FormData();
@@ -550,6 +618,7 @@ async function recognize() {
     if (!response.ok) throw new Error(payload.detail || t("recognitionHttpFailed", { status: response.status }));
     state.results = payload.results || [];
     state.documents = payload.documents || [];
+    state.hasCompletedRecognition = true;
     renderDocuments();
     renderResults();
     (payload.warnings || []).forEach((warning) => showToast(warning));
@@ -561,6 +630,7 @@ async function recognize() {
     showToast(error.message || t("recognitionFailed"));
   } finally {
     state.busy = false;
+    stopRecognitionProgress();
     elements.progressPanel.hidden = true;
     updateControls();
   }
@@ -589,6 +659,7 @@ function confidenceChip(confidence) {
 function renderResults(shouldScroll = true) {
   elements.resultList.replaceChildren();
   elements.resultsSection.hidden = false;
+  elements.ensembleAdvice.hidden = !state.results.length;
   elements.resultsSummary.textContent = state.results.length
     ? `${state.results.length === 1 ? t("resultsOne") : t("resultsMany", { count: state.results.length })} ${t("reviewReminder")}`
     : t("noEquationsDetected");
@@ -757,14 +828,11 @@ async function downloadDocumentWord() {
     const response = await fetch(`${normalizedApiUrl()}/api/export/docx`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ title: t("documentTitle"), markdown }),
+      body: JSON.stringify({ title: t("documentTitle"), markdown, save_to_downloads: true }),
     });
-    if (!response.ok) {
-      const payload = await response.json().catch(() => ({}));
-      throw new Error(payload.detail || t("wordFailed"));
-    }
-    downloadBlob(await response.blob(), exportFilename("docx"));
-    showToast(t("wordCreated"));
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(payload.detail || t("wordFailed"));
+    savedToast(payload);
   } catch (error) {
     showToast(error.message || t("wordFailed"));
   } finally {
@@ -788,27 +856,30 @@ function activeLatex() {
   return state.results.map((result) => result.latex.trim()).filter(Boolean);
 }
 
-function exportFilename(extension) {
-  return `${t("texTitle")} ${AUTHOR_SUFFIX}.${extension}`;
+// Report where a saved file landed. The backend returns an absolute path; we
+// show the folder + filename so the user knows it went to Downloads.
+function savedToast(payload) {
+  const path = payload && payload.path ? payload.path : "";
+  showToast(path ? t("savedTo", { path }) : t("wordCreated"));
 }
 
-function downloadBlob(blob, filename) {
-  const url = URL.createObjectURL(blob);
-  const anchor = document.createElement("a");
-  anchor.href = url;
-  anchor.download = filename;
-  document.body.append(anchor);
-  anchor.click();
-  anchor.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 500);
-}
-
-function downloadTex() {
+async function downloadTex() {
   const equations = activeLatex();
   if (!equations.length) return showToast(t("nothingToExport"));
   const body = equations.map((latex) => `\\[\n${latex}\n\\]`).join("\n\n");
   const tex = `% MathOCR export by Bouronikos Christos <chrisbouronikos@gmail.com>.\n% Support: https://paypal.me/christosbouronikos\n\\documentclass{article}\n\\usepackage{amsmath,amssymb}\n\\begin{document}\n${body}\n\\end{document}\n`;
-  downloadBlob(new Blob([tex], { type: "application/x-tex;charset=utf-8" }), exportFilename("tex"));
+  try {
+    const response = await fetch(`${normalizedApiUrl()}/api/export/text`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title: t("texTitle"), extension: "tex", content: tex }),
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(payload.detail || t("wordFailed"));
+    savedToast(payload);
+  } catch (error) {
+    showToast(error.message || t("wordFailed"));
+  }
 }
 
 async function downloadWord() {
@@ -821,14 +892,11 @@ async function downloadWord() {
     const response = await fetch(`${normalizedApiUrl()}/api/export/docx`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ title: t("texTitle"), equations }),
+      body: JSON.stringify({ title: t("texTitle"), equations, save_to_downloads: true }),
     });
-    if (!response.ok) {
-      const payload = await response.json().catch(() => ({}));
-      throw new Error(payload.detail || t("wordFailed"));
-    }
-    downloadBlob(await response.blob(), exportFilename("docx"));
-    showToast(t("wordCreated"));
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(payload.detail || t("wordFailed"));
+    savedToast(payload);
   } catch (error) {
     showToast(error.message || t("wordFailed"));
   } finally {
@@ -1072,6 +1140,7 @@ elements.downloadDocWordButton.addEventListener("click", downloadDocumentWord);
 elements.recheckButton.addEventListener("click", checkService);
 elements.refreshPageButton.addEventListener("click", () => location.reload());
 elements.updateButton.addEventListener("click", installUpdate);
+elements.checkUpdatesButton.addEventListener("click", () => checkUpdate(true));
 elements.apiUrl.addEventListener("change", () => {
   localStorage.setItem("mathocr-api-url", normalizedApiUrl());
   checkService();

@@ -244,6 +244,12 @@ h2 { font-size: clamp(1.5rem, 3vw, 2rem); }
 }
 .results-heading p { margin: 8px 0 0; color: var(--muted); font-size: 0.76rem; max-width: 560px; }
 .export-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 7px; }
+.ensemble-advice {
+  display: grid; gap: 2px; margin-top: 16px; padding: 12px 14px;
+  border: 1px solid #bad6ca; border-left: 4px solid var(--green); border-radius: 10px;
+  color: #21483d; background: #e7f1ec; font-size: 0.74rem;
+}
+.ensemble-advice strong { font-size: 0.76rem; }
 .result-list { display: grid; gap: 10px; margin-top: 14px; }
 .result-card {
   display: grid; grid-template-columns: 1fr 1fr;
@@ -382,6 +388,11 @@ h2 { font-size: clamp(1.5rem, 3vw, 2rem); }
   border-top: 1px solid rgba(255, 255, 255, 0.14);
   font-size: 0.68rem; color: rgba(255, 255, 255, 0.55);
 }
+.link-button {
+  padding: 0; border: 0; background: none; cursor: pointer;
+  color: rgba(255, 255, 255, 0.78); font: inherit; font-weight: 800; text-decoration: underline;
+}
+.link-button:hover { color: #fff; }
 
 /* ---------- toast ---------- */
 

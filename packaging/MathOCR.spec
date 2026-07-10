@@ -109,6 +109,12 @@ analysis = Analysis(
 
 pyz = PYZ(analysis.pure)
 
+# App icon: the in-app brand mark (white ∫ on a green disc). Windows reads the
+# .ico from the EXE; macOS reads the .icns from the BUNDLE below.
+WINDOWS_ICON = PROJECT_ROOT / "packaging" / "MathOCR.ico"
+MACOS_ICON = PROJECT_ROOT / "packaging" / "MathOCR.icns"
+exe_icon = str(WINDOWS_ICON) if (sys.platform == "win32" and WINDOWS_ICON.is_file()) else None
+
 exe = EXE(
     pyz,
     analysis.scripts,
@@ -125,6 +131,7 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
+    icon=exe_icon,
 )
 
 collection = COLLECT(
@@ -141,11 +148,12 @@ if sys.platform == "darwin":
     app = BUNDLE(
         collection,
         name="MathOCR.app",
+        icon=str(MACOS_ICON) if MACOS_ICON.is_file() else None,
         bundle_identifier="com.christosbouronikos.mathocr",
         info_plist={
             "CFBundleDisplayName": "MathOCR",
             "CFBundleName": "MathOCR",
-            "CFBundleShortVersionString": "1.0.5",
+            "CFBundleShortVersionString": "1.0.6",
             "NSHighResolutionCapable": True,
             "NSHumanReadableCopyright": "Copyright © 2026 Bouronikos Christos",
         },

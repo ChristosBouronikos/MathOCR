@@ -2,7 +2,7 @@
 ; Support development: https://paypal.me/christosbouronikos
 
 #define MyAppName "MathOCR"
-#define MyAppVersion "1.0.5"
+#define MyAppVersion "1.0.6"
 #define MyAppPublisher "Bouronikos Christos"
 #define MyAppURL "https://paypal.me/christosbouronikos"
 #define MyAppExeName "MathOCR.exe"
@@ -24,6 +24,7 @@ SourceDir={#SourcePath}..\..
 LicenseFile=LICENSE
 OutputDir=dist
 OutputBaseFilename=MathOCR-Setup
+SetupIconFile=packaging\MathOCR.ico
 Compression=lzma2/ultra64
 SolidCompression=yes
 WizardStyle=modern

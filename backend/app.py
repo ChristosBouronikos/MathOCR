@@ -117,7 +117,7 @@ def find_pandoc() -> str | None:
 app = FastAPI(
     title="MathOCR local API",
     description="Local image/PDF mathematics recognition and editable Word equation export.",
-    version="1.0.0",
+    version="1.0.1",
     contact={"name": AUTHOR, "email": AUTHOR_EMAIL, "url": DONATION_URL},
 )
 

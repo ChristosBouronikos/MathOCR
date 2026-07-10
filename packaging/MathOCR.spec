@@ -92,7 +92,7 @@ if sys.platform == "darwin":
         info_plist={
             "CFBundleDisplayName": "MathOCR",
             "CFBundleName": "MathOCR",
-            "CFBundleShortVersionString": "1.0.0",
+            "CFBundleShortVersionString": "1.0.1",
             "NSHighResolutionCapable": True,
             "NSHumanReadableCopyright": "Copyright © 2026 Bouronikos Christos",
         },

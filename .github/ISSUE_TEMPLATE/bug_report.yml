@@ -1,0 +1,52 @@
+# MathOCR bug report form by Bouronikos Christos <chrisbouronikos@gmail.com>.
+# Support development: https://paypal.me/christosbouronikos
+
+name: Report a MathOCR bug
+description: Tell the developer about a reproducible problem.
+title: "[Bug]: "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for helping improve MathOCR. Do not attach private documents; use a non-sensitive sample when possible.
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Platform
+      options:
+        - macOS Apple Silicon
+        - macOS Intel
+        - Windows
+        - GitHub Pages
+        - Local browser
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: What happened?
+      description: Describe the problem and what you expected instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open MathOCR
+        2. Choose ...
+        3. See ...
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: MathOCR version
+      placeholder: "For example: 0.3.0"
+  - type: textarea
+    id: notes
+    attributes:
+      label: Additional details
+      description: Add non-sensitive screenshots or logs if they help explain the issue.
+

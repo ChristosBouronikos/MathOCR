@@ -1,0 +1,218 @@
+<!doctype html>
+<!--
+  MathOCR interface by Bouronikos Christos <chrisbouronikos@gmail.com>.
+  Support continued development at https://paypal.me/christosbouronikos.
+
+  A single static page: drop an image or PDF, review the recognized LaTeX,
+  export editable Word equations. Everything is processed by the local
+  MathOCR engine; nothing leaves the computer. KaTeX is bundled locally so
+  previews also work completely offline inside the desktop application.
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="Convert mathematics in images and PDFs into editable LaTeX and Word equations — locally, on your computer." />
+    <meta name="author" content="Bouronikos Christos" />
+    <meta name="theme-color" content="#f5f1e8" />
+    <title>MathOCR by Bouronikos Christos</title>
+    <link rel="stylesheet" href="./vendor/katex/katex.min.css" />
+    <link rel="stylesheet" href="./styles.css?v=1.0.0" />
+    <script defer src="./vendor/katex/katex.min.js"></script>
+    <script defer src="./app.js?v=1.0.0"></script>
+  </head>
+  <body>
+    <header class="site-header">
+      <a class="brand" href="#top" aria-label="MathOCR">
+        <span class="brand-mark" aria-hidden="true">∫</span>
+        <span class="brand-text">
+          <span class="brand-title">MathOCR</span>
+          <span class="brand-by" data-i18n="brandBy">by Bouronikos Christos</span>
+        </span>
+      </a>
+      <div class="header-controls">
+        <div class="language-switch" role="group" aria-label="Language / Γλώσσα">
+          <button type="button" data-language="en" aria-pressed="true">EN</button>
+          <button type="button" data-language="el" aria-pressed="false">ΕΛ</button>
+        </div>
+        <div class="service-pill" id="servicePill">
+          <span class="status-dot" aria-hidden="true"></span>
+          <span id="serviceText" data-i18n="serviceChecking">Checking engine…</span>
+        </div>
+      </div>
+    </header>
+
+    <main id="top">
+      <section class="intro">
+        <p class="eyebrow" data-i18n="eyebrow">LOCAL MATHEMATICS OCR</p>
+        <h1 data-i18n="introTitle">Images and PDFs into editable equations.</h1>
+        <p class="intro-copy" data-i18n="introCopy">Drop a file, review the LaTeX, export editable Word equations. Everything runs on your computer.</p>
+      </section>
+
+      <section class="engine-banner" id="engineBanner" hidden>
+        <div>
+          <strong data-i18n="engineBannerTitle">The local engine is not running.</strong>
+          <span data-i18n="engineBannerCopy">Recognition happens on your computer, so MathOCR needs its engine.</span>
+        </div>
+        <a
+          id="engineBannerLink"
+          href="https://github.com/ChristosBouronikos/MathOCR/releases/latest"
+          target="_blank"
+          rel="noopener noreferrer"
+        ><span data-i18n="engineBannerAction">Get the desktop app</span> ↗</a>
+      </section>
+
+      <section class="workspace" aria-label="Recognition workspace">
+        <label class="drop-zone" id="dropZone" for="fileInput">
+          <input
+            id="fileInput"
+            type="file"
+            accept="image/png,image/jpeg,image/webp,image/tiff,application/pdf,.pdf,.png,.jpg,.jpeg,.webp,.tif,.tiff"
+            multiple
+          />
+          <span class="drop-icon" aria-hidden="true">↥</span>
+          <strong data-i18n="dropFiles">Drop images or PDFs here</strong>
+          <span class="drop-hint" data-i18n="browseFiles">click to browse, or paste a screenshot (Ctrl+V) · PNG, JPG, WEBP, TIFF, PDF</span>
+        </label>
+
+        <div class="file-list" id="fileList" aria-live="polite"></div>
+
+        <div class="options-row">
+          <label class="field">
+            <span data-i18n="inputType">What do you want to recognize?</span>
+            <select id="recognitionMode">
+              <option value="document" data-i18n="modeDocument">All text + math (whole document)</option>
+              <option value="mixed" selected data-i18n="modeMixed">Only the math inside a page of text</option>
+              <option value="formula" data-i18n="modeFormula">Only one equation (cropped image)</option>
+            </select>
+          </label>
+          <label class="field">
+            <span data-i18n="mathEngine">Math engine</span>
+            <select id="mathEngine">
+              <option value="auto" selected data-i18n="engineBest">Best — cross-check all (recommended)</option>
+              <option value="pix2text-mfr" data-i18n="enginePix2text">Pix2Text MFR-1.5</option>
+              <option value="pix2tex" data-i18n="enginePix2tex">pix2tex (LaTeX-OCR)</option>
+              <option value="rapid-latex" data-i18n="engineRapid">RapidLaTeXOCR</option>
+            </select>
+          </label>
+          <label class="field small-field">
+            <span data-i18n="pageLimit">PDF page limit</span>
+            <input id="pageLimit" type="number" value="10" min="1" max="20" />
+          </label>
+          <label class="field doc-only" id="docEngineField" hidden>
+            <span data-i18n="docReader">Text reader (document mode)</span>
+            <select id="docEngine">
+              <option value="layout" selected data-i18n="docLayout">Greek + English (Tesseract)</option>
+              <option value="nougat" data-i18n="docNougat">Nougat — English papers (optional)</option>
+            </select>
+          </label>
+        </div>
+
+        <button class="primary-button recognize-button" id="recognizeButton" type="button" disabled>
+          <span data-i18n="recognize">Recognize mathematics</span>
+          <span aria-hidden="true">→</span>
+        </button>
+
+        <details class="advanced" id="advancedSettings">
+          <summary data-i18n="engineAddress">Advanced: engine address</summary>
+          <div class="advanced-row">
+            <input id="apiUrl" type="url" value="http://127.0.0.1:8000" spellcheck="false" aria-label="API URL" />
+            <button class="text-button" id="recheckButton" type="button" data-i18n="checkConnection">Check connection</button>
+          </div>
+          <p class="connection-help" id="connectionHelp" data-i18n="connectionInitial">Start the local engine to enable recognition and Word export.</p>
+        </details>
+      </section>
+
+      <section class="progress-panel" id="progressPanel" hidden aria-live="polite">
+        <div class="progress-copy">
+          <strong data-i18n="readingMath">Reading mathematics…</strong>
+          <span data-i18n="firstRun">The first run downloads model files (about 1.3 GB) and takes several minutes.</span>
+        </div>
+        <div class="progress-track"><span></span></div>
+      </section>
+
+      <section class="document-section" id="documentSection" hidden aria-labelledby="documentTitle">
+        <div class="results-heading">
+          <div>
+            <h2 id="documentTitle" data-i18n="reconstructedDocument">Reconstructed document</h2>
+            <p data-i18n="documentHint">Edit the text and math below, then export the whole document to Word.</p>
+          </div>
+          <div class="export-actions">
+            <button class="secondary-button" id="copyDocButton" type="button" data-i18n="copyDocument">Copy text</button>
+            <button class="primary-button word-button" id="downloadDocWordButton" type="button" data-i18n="downloadDocWord">Download document (Word)</button>
+          </div>
+        </div>
+        <div class="document-list" id="documentList"></div>
+      </section>
+
+      <section class="results-section" id="resultsSection" hidden aria-labelledby="resultsTitle">
+        <div class="results-heading">
+          <div>
+            <h2 id="resultsTitle" data-i18n="recognizedEquations">Recognized equations</h2>
+            <p id="resultsSummary"></p>
+          </div>
+          <div class="export-actions">
+            <button class="secondary-button" id="copyAllButton" type="button" data-i18n="copyAll">Copy all LaTeX</button>
+            <button class="secondary-button" id="downloadTexButton" type="button" data-i18n="downloadTex">Download .tex</button>
+            <button class="primary-button word-button" id="downloadWordButton" type="button" data-i18n="downloadWord">Download Word</button>
+          </div>
+        </div>
+        <div class="result-list" id="resultList"></div>
+      </section>
+
+      <section class="storage-section" id="storageSection" aria-labelledby="storageTitle">
+        <div class="storage-heading">
+          <div>
+            <h2 id="storageTitle" data-i18n="storageTitle">Models on this computer</h2>
+            <p data-i18n="storageCopy">Recognition models are downloaded once and stored locally. Delete them anytime to free disk space; they download again when needed.</p>
+          </div>
+          <div class="storage-total">
+            <span data-i18n="storageTotal">Total space used</span>
+            <strong id="storageTotalBytes">—</strong>
+          </div>
+        </div>
+        <div class="storage-list" id="storageList"></div>
+        <div class="storage-actions">
+          <button class="secondary-button" id="downloadModelsButton" type="button" data-i18n="downloadModels">Download all models now</button>
+          <button class="danger-button" id="deleteAllModelsButton" type="button" data-i18n="deleteAllModels">Delete all models</button>
+        </div>
+        <p class="storage-path"><span data-i18n="storagePath">Storage folder</span>: <code id="storagePathValue">—</code></p>
+      </section>
+
+      <section class="privacy-strip">
+        <strong data-i18n="privateTitle">Private by design.</strong>
+        <span data-i18n="privateCopy">Files are processed only by the MathOCR engine running on this computer and never leave it.</span>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <div class="footer-inner">
+        <div class="footer-brand">
+          <span class="footer-mark" aria-hidden="true">∫</span>
+          <div>
+            <strong>MathOCR</strong>
+            <p data-i18n="footerTagline">Local mathematics recognition with editable output.</p>
+          </div>
+        </div>
+        <nav class="footer-column" aria-label="Project">
+          <h3 data-i18n="footerProject">Project</h3>
+          <a href="https://github.com/ChristosBouronikos/MathOCR" target="_blank" rel="noopener noreferrer" data-i18n="footerSource">Source code</a>
+          <a href="https://github.com/ChristosBouronikos/MathOCR/releases/latest" target="_blank" rel="noopener noreferrer" data-i18n="footerDownloads">Downloads</a>
+          <a href="https://github.com/ChristosBouronikos/MathOCR/issues/new?template=bug_report.yml" target="_blank" rel="noopener noreferrer" data-i18n="footerReportBug">Report a bug</a>
+        </nav>
+        <nav class="footer-column" aria-label="Author">
+          <h3 data-i18n="footerAuthor">Author</h3>
+          <a href="https://github.com/ChristosBouronikos" target="_blank" rel="noopener noreferrer" data-i18n="footerGithub">GitHub profile</a>
+          <a href="mailto:chrisbouronikos@gmail.com">chrisbouronikos@gmail.com</a>
+          <a href="https://paypal.me/christosbouronikos" target="_blank" rel="noopener noreferrer" data-i18n="footerDonate">Support on PayPal ♥</a>
+        </nav>
+      </div>
+      <div class="footer-legal">
+        <span>© 2026 Bouronikos Christos · <span data-i18n="footerLicense">MIT License</span></span>
+        <span>MathOCR <span id="footerVersion">1.0.0</span> · <span data-i18n="footerMadeWith">made for students, teachers, and researchers</span></span>
+      </div>
+    </footer>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  </body>
+</html>

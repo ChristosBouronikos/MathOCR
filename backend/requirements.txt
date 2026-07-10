@@ -1,0 +1,24 @@
+# MathOCR runtime dependencies — Bouronikos Christos <chrisbouronikos@gmail.com>
+# Support development: https://paypal.me/christosbouronikos
+# Python 3.11 is recommended because ML packages often lag behind the newest Python.
+#
+# Math recognition engines (vote on every formula):
+#   pix2text        → Pix2Text MFR-1.5 recognizer + MFD-1.5 math detector (primary/default)
+#   pix2tex         → the classic LaTeX-OCR model (second opinion)
+#   rapid-latex-ocr → ONNX LaTeX-OCR port (fast tie-breaker)
+#
+# Text recognition (Greek + English), used by the "document" mode:
+#   pytesseract     → Python binding for the Tesseract engine. The Tesseract
+#                     program itself is bundled in the desktop app and, for a
+#                     source run, installed by the launcher (brew/apt/choco).
+#                     Greek needs the 'ell' language data, downloaded on demand.
+#
+# Nougat (Meta, English academic papers) is an OPTIONAL add-on and is not
+# listed here on purpose: its model weights are CC-BY-NC (non-commercial), so
+# it is never bundled. Enable it with:  pip install nougat-ocr
+
+-r requirements-core.txt
+pix2tex>=0.1.4,<1
+pix2text>=1.1.2,<2
+rapid-latex-ocr>=0.0.9,<1
+pytesseract>=0.3.10,<1

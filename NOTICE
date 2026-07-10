@@ -1,0 +1,39 @@
+MathOCR
+Copyright (c) 2026 Bouronikos Christos <chrisbouronikos@gmail.com>
+https://github.com/ChristosBouronikos/MathOCR
+
+MathOCR itself is released under the MIT License (see LICENSE). It builds on
+the open-source components below; each keeps its own license, and MathOCR is
+grateful to their authors. When you redistribute MathOCR — especially a
+packaged build that bundles some of these — include the relevant notices.
+
+Bundled and directly used
+-------------------------
+- Pix2Text (MFR-1.5 recognizer, MFD-1.5 detector) — MIT License
+  https://github.com/breezedeus/Pix2Text
+- pix2tex / LaTeX-OCR — MIT License
+  https://github.com/lukas-blecher/LaTeX-OCR
+- RapidLaTeXOCR — Apache License 2.0
+  https://github.com/RapidAI/RapidLatexOCR
+- Tesseract OCR (invoked as a separate program) — Apache License 2.0
+  https://github.com/tesseract-ocr/tesseract
+  Language data (ell, eng) from tessdata_fast — Apache License 2.0
+  https://github.com/tesseract-ocr/tessdata_fast
+- pytesseract — Apache License 2.0
+- Pandoc (invoked as a separate program) — GPL v2 or later
+  https://pandoc.org  (used as an unmodified external tool, not linked)
+- KaTeX (bundled in frontend/vendor/katex) — MIT License
+  https://github.com/KaTeX/KaTeX
+- FastAPI, Uvicorn, Pillow, pypdfium2, pywebview, PyInstaller and their
+  dependencies — each under its own permissive license (MIT/BSD/Apache).
+
+Optional, NOT bundled
+---------------------
+- Nougat (Meta) — code MIT; MODEL WEIGHTS ARE CC-BY-NC 4.0 (non-commercial).
+  https://github.com/facebookresearch/nougat
+  Because the weights are non-commercial, MathOCR never ships them. They are
+  downloaded only if the user installs `nougat-ocr` and explicitly enables the
+  engine. Do not include Nougat weights in a commercial distribution.
+
+Trademarks and model credits belong to their respective owners. This notice is
+informational and does not modify any component's license.

@@ -1,0 +1,21 @@
+# MathOCR ignore rules by Bouronikos Christos <chrisbouronikos@gmail.com>.
+# Support development: https://paypal.me/christosbouronikos
+
+.DS_Store
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.env
+*.docx
+*.pdf
+model-cache/
+build/
+dist/
+*.spec.bak
+.pyinstaller-cache/
+.build-cache/

@@ -1,0 +1,13 @@
+# MathOCR Docker build exclusions by Bouronikos Christos <chrisbouronikos@gmail.com>.
+# Support development: https://paypal.me/christosbouronikos
+
+.git
+.github
+.venv
+__pycache__
+.pytest_cache
+.ruff_cache
+tests
+*.docx
+*.pdf
+

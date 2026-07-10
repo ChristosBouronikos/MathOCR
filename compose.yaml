@@ -1,0 +1,17 @@
+# MathOCR Docker Compose setup by Bouronikos Christos <chrisbouronikos@gmail.com>.
+# Support development at https://paypal.me/christosbouronikos.
+
+services:
+  mathocr:
+    build: .
+    ports:
+      - "127.0.0.1:8000:8000"
+    environment:
+      MATHOCR_DEVICE: cpu
+      HF_HOME: /model-cache/huggingface
+    volumes:
+      - model-cache:/model-cache
+
+volumes:
+  model-cache:
+

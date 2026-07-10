@@ -1,0 +1,7 @@
+# MathOCR development tools — Bouronikos Christos <chrisbouronikos@gmail.com>
+# Support development: https://paypal.me/christosbouronikos
+
+-r requirements-core.txt
+httpx>=0.28,<1
+pytest>=8.4,<10
+ruff>=0.12,<1

@@ -1,0 +1,9 @@
+# MathOCR desktop build dependencies — Bouronikos Christos <chrisbouronikos@gmail.com>
+# Support development: https://paypal.me/christosbouronikos
+# Build separately on each target OS; end users install none of these packages.
+
+-r requirements.txt
+pywebview>=5.4,<7
+pyinstaller>=6.19,<7
+pypandoc_binary>=1.15,<2
+

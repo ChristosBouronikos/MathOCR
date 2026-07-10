@@ -17,6 +17,10 @@ AppSupportURL=mailto:chrisbouronikos@gmail.com
 DefaultDirName={autopf}\{#MyAppName}
 DefaultGroupName={#MyAppName}
 DisableProgramGroupPage=yes
+; Resolve every relative path below from the repository root (this .iss lives in
+; packaging\windows\), so LicenseFile, [Files] Source, and OutputDir all work
+; regardless of the compiler's working directory.
+SourceDir={#SourcePath}..\..
 LicenseFile=LICENSE
 OutputDir=dist
 OutputBaseFilename=MathOCR-Setup

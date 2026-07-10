@@ -36,6 +36,19 @@ def expected_application() -> Path:
     return DIST / "MathOCR" / executable
 
 
+def validate_bundled_resources(output: Path) -> None:
+    """Fail a Windows release build if RapidOCR's manifest was omitted."""
+
+    if sys.platform != "win32":
+        return
+
+    manifest = output.parent / "_internal" / "rapidocr" / "default_models.yaml"
+    if not manifest.is_file():
+        raise SystemExit(
+            "PyInstaller omitted RapidOCR's model manifest: " f"{manifest}"
+        )
+
+
 def main() -> None:
     """Clean stale output, run the specification, and validate the artifact."""
 
@@ -58,6 +71,7 @@ def main() -> None:
     output = expected_application()
     if not output.exists():
         raise SystemExit(f"PyInstaller finished without creating {output}")
+    validate_bundled_resources(output)
     print(f"Desktop application created: {output}")
 
 

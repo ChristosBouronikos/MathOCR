@@ -14,6 +14,9 @@ PROJECT_ROOT = Path(SPECPATH).parent.resolve()
 # imports and package data (yaml configs, tokenizer files), so collect_all is
 # intentional for the release build. rapid_latex_ocr and the cn* packages ship
 # configuration files their loaders read from inside the package directory.
+# rapidocr is a transitive dependency of cnstd/cnocr (pix2text's detector and
+# recognizer backends) and ships its own default_models.yaml the same way;
+# missing it here caused a FileNotFoundError on first recognition in v1.0.2.
 datas = [(str(PROJECT_ROOT / "frontend"), "frontend")]
 binaries = []
 hiddenimports = ["pytesseract"]
@@ -23,6 +26,7 @@ for package_name in (
     "rapid_latex_ocr",
     "cnstd",
     "cnocr",
+    "rapidocr",
     "pypandoc",
     "pypdfium2",
 ):

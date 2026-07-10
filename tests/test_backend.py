@@ -19,7 +19,9 @@ from backend.app import (
     app,
     export_filename,
     find_pandoc,
+    is_newer,
     markdown_document,
+    parse_version,
     pdf_pages,
     safe_filename,
 )
@@ -218,3 +220,52 @@ def test_docx_export_contains_native_word_equation_markup() -> None:
     with zipfile.ZipFile(io.BytesIO(response.content)) as archive:
         document_xml = archive.read("word/document.xml")
     assert b"m:oMath" in document_xml
+
+
+def test_parse_version_and_is_newer() -> None:
+    assert parse_version("v1.0.3") == (1, 0, 3)
+    assert parse_version("1.2") == (1, 2)
+    assert parse_version("garbage") == (0,)
+    assert is_newer("1.0.3", "1.0.2") is True
+    assert is_newer("v1.1.0", "1.0.9") is True
+    assert is_newer("1.0.2", "1.0.2") is False
+    assert is_newer("1.0.1", "1.0.2") is False
+
+
+def test_update_check_reports_a_newer_release(monkeypatch: pytest.MonkeyPatch) -> None:
+    import backend.app as app_module
+
+    fake_asset = {"name": "MathOCR-Setup.exe", "browser_download_url": "https://x/y", "size": 42}
+    monkeypatch.setattr(
+        app_module,
+        "fetch_latest_release",
+        lambda: {"tag_name": "v999.0.0", "html_url": "https://notes", "assets": [fake_asset]},
+    )
+    monkeypatch.setattr(app_module, "platform_asset", lambda assets: fake_asset)
+
+    payload = client.get("/api/update/check").json()
+    assert payload["latest"] == "999.0.0"
+    assert payload["update_available"] is True
+    assert payload["asset_name"] == "MathOCR-Setup.exe"
+    # Running under pytest the app is not frozen, so it cannot self-install.
+    assert payload["can_install"] is False
+
+
+def test_update_check_ignores_same_or_older_release(monkeypatch: pytest.MonkeyPatch) -> None:
+    import backend.app as app_module
+
+    monkeypatch.setattr(
+        app_module,
+        "fetch_latest_release",
+        lambda: {"tag_name": "v0.0.1", "assets": []},
+    )
+    payload = client.get("/api/update/check").json()
+    assert payload["update_available"] is False
+
+
+def test_update_install_refuses_outside_frozen_app() -> None:
+    # Not frozen under pytest, so the endpoint must refuse before any download
+    # or process exit is attempted.
+    response = client.post("/api/update/install")
+    assert response.status_code == 422
+    assert "packaged app" in response.json()["detail"]

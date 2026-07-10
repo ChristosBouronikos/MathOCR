@@ -26,6 +26,14 @@ const translations = {
     pageTitle: "MathOCR by Bouronikos Christos",
     brandBy: "by Bouronikos Christos",
     refreshPage: "Refresh",
+    updateTitle: "A new version is available",
+    updateDetail: "MathOCR {{latest}} is available — you have {{current}}.",
+    updateNotes: "Release notes ↗",
+    updateNow: "Update now",
+    updateDownload: "Download ↗",
+    updateStartedWin: "Installer launched. MathOCR will now close to finish updating.",
+    updateStartedMac: "Update downloaded to your Downloads folder. Drag MathOCR into Applications to replace the old version, then reopen it.",
+    updateFailed: "The update could not be downloaded — try again or download it from GitHub.",
     serviceChecking: "Checking engine…",
     serviceReady: "Local engine ready",
     serviceNoPandoc: "OCR ready · Pandoc missing",
@@ -145,6 +153,14 @@ const translations = {
     pageTitle: "MathOCR από τον Χρήστο Μπουρονίκο",
     brandBy: "από τον Χρήστο Μπουρονίκο",
     refreshPage: "Ανανέωση",
+    updateTitle: "Διαθέσιμη νέα έκδοση",
+    updateDetail: "Η έκδοση MathOCR {{latest}} είναι διαθέσιμη — έχετε την {{current}}.",
+    updateNotes: "Σημειώσεις έκδοσης ↗",
+    updateNow: "Ενημέρωση τώρα",
+    updateDownload: "Λήψη ↗",
+    updateStartedWin: "Ο εγκαταστάτης ξεκίνησε. Το MathOCR θα κλείσει τώρα για να ολοκληρωθεί η ενημέρωση.",
+    updateStartedMac: "Η ενημέρωση κατέβηκε στον φάκελο Λήψεις. Σύρετε το MathOCR στις Εφαρμογές για να αντικαταστήσετε την παλιά έκδοση και ανοίξτε το ξανά.",
+    updateFailed: "Η ενημέρωση δεν κατέβηκε — δοκιμάστε ξανά ή κατεβάστε την από το GitHub.",
     serviceChecking: "Έλεγχος μηχανής…",
     serviceReady: "Η τοπική μηχανή είναι έτοιμη",
     serviceNoPandoc: "OCR έτοιμο · λείπει το Pandoc",
@@ -280,6 +296,7 @@ const state = {
   busy: false,
   language: initialLanguage,
   storage: null,
+  update: null,
 };
 
 function t(key, variables = {}) {
@@ -299,6 +316,7 @@ for (const id of [
   "pageLimit", "progressPanel", "recognitionMode", "recognizeButton", "recheckButton", "refreshPageButton",
   "resultList", "resultsSection", "resultsSummary", "servicePill", "serviceText", "storageList",
   "storagePathValue", "storageSection", "storageTotalBytes", "toast",
+  "updateBanner", "updateButton", "updateDetail", "updateNotesLink",
 ]) {
   elements[id] = document.querySelector(`#${id}`);
 }
@@ -320,6 +338,7 @@ function applyLanguage(language) {
   updateModeOptions();
   renderFiles();
   renderStorage();
+  renderUpdateBanner();
   if (!elements.documentSection.hidden) renderDocuments();
   if (!elements.resultsSection.hidden) renderResults(false);
 }
@@ -379,6 +398,7 @@ async function checkService() {
     state.nougatInstallable = Boolean(health.nougat_installable);
     elements.servicePill.classList.add("online");
     refreshStorage();
+    checkUpdate(); // non-blocking: reveal the banner if a newer release exists
   } catch (_error) {
     state.online = false;
     state.pandoc = false;
@@ -393,6 +413,61 @@ async function checkService() {
   updateServiceCopy();
   updateModeOptions();
   updateControls();
+}
+
+/* ---------- in-app updates ---------- */
+
+async function checkUpdate() {
+  try {
+    const response = await fetch(`${normalizedApiUrl()}/api/update/check`, {
+      signal: AbortSignal.timeout(9000),
+    });
+    if (!response.ok) return; // offline or rate-limited: stay quiet
+    state.update = await response.json();
+  } catch (_error) {
+    return; // never let an update check disrupt normal use
+  }
+  renderUpdateBanner();
+}
+
+function renderUpdateBanner() {
+  const info = state.update;
+  if (!info || !info.update_available) {
+    elements.updateBanner.hidden = true;
+    return;
+  }
+  elements.updateBanner.hidden = false;
+  elements.updateDetail.textContent = t("updateDetail", {
+    latest: info.latest,
+    current: info.current,
+  });
+  elements.updateNotesLink.href = info.notes_url || "#";
+  // In the packaged app the button installs in place; from source (or a browser)
+  // it becomes a plain link to the releases page.
+  elements.updateButton.textContent = info.can_install ? t("updateNow") : t("updateDownload");
+}
+
+async function installUpdate() {
+  const info = state.update || {};
+  if (!info.can_install) {
+    window.open(info.notes_url || "https://github.com/ChristosBouronikos/MathOCR/releases/latest", "_blank");
+    return;
+  }
+  elements.updateButton.disabled = true;
+  elements.updateButton.textContent = t("downloadingModels");
+  try {
+    const response = await fetch(`${normalizedApiUrl()}/api/update/install`, { method: "POST" });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(payload.detail || t("updateFailed"));
+    const message = payload.platform === "darwin" ? t("updateStartedMac") : t("updateStartedWin");
+    elements.updateDetail.textContent = message;
+    elements.updateButton.hidden = true;
+    showToast(message);
+  } catch (error) {
+    showToast(error.message || t("updateFailed"));
+    elements.updateButton.disabled = false;
+    elements.updateButton.textContent = t("updateNow");
+  }
 }
 
 /* ---------- mode + engine options ---------- */
@@ -996,6 +1071,7 @@ elements.copyDocButton.addEventListener("click", () => copyText(documentMarkdown
 elements.downloadDocWordButton.addEventListener("click", downloadDocumentWord);
 elements.recheckButton.addEventListener("click", checkService);
 elements.refreshPageButton.addEventListener("click", () => location.reload());
+elements.updateButton.addEventListener("click", installUpdate);
 elements.apiUrl.addEventListener("change", () => {
   localStorage.setItem("mathocr-api-url", normalizedApiUrl());
   checkService();

@@ -16,7 +16,7 @@ PROJECT_ROOT = Path(SPECPATH).parent.resolve()
 # configuration files their loaders read from inside the package directory.
 # rapidocr is a transitive dependency of cnstd/cnocr (pix2text's detector and
 # recognizer backends) and ships its own default_models.yaml the same way;
-# missing it here caused a FileNotFoundError on first recognition in v1.0.2.
+# missing it here caused a FileNotFoundError on first recognition in early builds.
 datas = [(str(PROJECT_ROOT / "frontend"), "frontend")]
 binaries = []
 hiddenimports = ["pytesseract"]
@@ -96,7 +96,7 @@ if sys.platform == "darwin":
         info_plist={
             "CFBundleDisplayName": "MathOCR",
             "CFBundleName": "MathOCR",
-            "CFBundleShortVersionString": "1.0.2",
+            "CFBundleShortVersionString": "1.0.4",
             "NSHighResolutionCapable": True,
             "NSHumanReadableCopyright": "Copyright © 2026 Bouronikos Christos",
         },

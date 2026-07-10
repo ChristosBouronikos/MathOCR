@@ -2,7 +2,7 @@
 ; Support development: https://paypal.me/christosbouronikos
 
 #define MyAppName "MathOCR"
-#define MyAppVersion "1.0.2"
+#define MyAppVersion "1.0.4"
 #define MyAppPublisher "Bouronikos Christos"
 #define MyAppURL "https://paypal.me/christosbouronikos"
 #define MyAppExeName "MathOCR.exe"

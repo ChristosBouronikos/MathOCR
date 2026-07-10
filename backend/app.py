@@ -13,13 +13,17 @@ documents through Pandoc, and manages the on-disk model storage.
 from __future__ import annotations
 
 import io
+import json
 import logging
 import os
+import platform
 import re
 import shutil
 import subprocess
 import sys
 import tempfile
+import threading
+import urllib.request
 from pathlib import Path
 from typing import Annotated, Literal
 
@@ -75,6 +79,12 @@ MAX_FILES = 12
 SUPPORTED_EXTENSIONS = {".pdf", ".png", ".jpg", ".jpeg", ".webp", ".tif", ".tiff"}
 PDF_RENDER_SCALE = 2.8  # ≈200 dpi; complicated formulas need the extra pixels
 
+# In-app updates read the newest GitHub release and, in the packaged app, launch
+# its installer (which upgrades over the current install and relaunches).
+GITHUB_REPO = "ChristosBouronikos/MathOCR"
+GITHUB_LATEST_RELEASE_URL = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
+GITHUB_RELEASES_PAGE = f"https://github.com/{GITHUB_REPO}/releases/latest"
+
 
 def application_root() -> Path:
     """Return the source root or PyInstaller's extracted resource directory."""
@@ -117,7 +127,7 @@ def find_pandoc() -> str | None:
 app = FastAPI(
     title="MathOCR local API",
     description="Local image/PDF mathematics recognition and editable Word equation export.",
-    version="1.0.2",
+    version="1.0.4",
     contact={"name": AUTHOR, "email": AUTHOR_EMAIL, "url": DONATION_URL},
 )
 
@@ -616,6 +626,146 @@ def delete_models(engine: str | None = None) -> DeleteModelsResponse:
         deleted_paths=report.deleted_paths,
         failed_paths=report.failed_paths,
     )
+
+
+# ---------------------------------------------------------------------------
+# In-app updates
+# ---------------------------------------------------------------------------
+
+
+def parse_version(text: str) -> tuple[int, ...]:
+    """Turn a version string like 'v1.0.3' into a comparable tuple (1, 0, 3)."""
+
+    parts: list[int] = []
+    for chunk in text.strip().lstrip("vV").split("."):
+        match = re.match(r"\d+", chunk)
+        parts.append(int(match.group()) if match else 0)
+    return tuple(parts) or (0,)
+
+
+def is_newer(latest: str, current: str) -> bool:
+    """True when ``latest`` is a strictly higher version than ``current``."""
+
+    return parse_version(latest) > parse_version(current)
+
+
+def fetch_latest_release() -> dict:
+    """Read the newest published release from the GitHub API."""
+
+    request = urllib.request.Request(
+        GITHUB_LATEST_RELEASE_URL,
+        headers={"User-Agent": model_store.USER_AGENT, "Accept": "application/vnd.github+json"},
+    )
+    with urllib.request.urlopen(request, timeout=10) as response:
+        return json.load(response)
+
+
+def platform_asset(assets: list[dict]) -> dict | None:
+    """Pick the release asset that matches this operating system (and CPU)."""
+
+    if sys.platform == "win32":
+        suffix = ".exe"
+    elif sys.platform == "darwin":
+        suffix = ".dmg"
+    else:
+        return None
+    matches = [asset for asset in assets if str(asset.get("name", "")).lower().endswith(suffix)]
+    if suffix == ".dmg" and len(matches) > 1:
+        arch = platform.machine().lower()  # 'arm64' or 'x86_64'
+        preferred = [asset for asset in matches if arch in str(asset.get("name", "")).lower()]
+        if preferred:
+            return preferred[0]
+    return matches[0] if matches else None
+
+
+@app.get("/api/update/check")
+async def update_check() -> dict[str, object]:
+    """Report whether a newer packaged release exists on GitHub."""
+
+    try:
+        release = await run_in_threadpool(fetch_latest_release)
+    except Exception as exc:
+        logger.warning("Update check failed: %s", exc)
+        raise HTTPException(status_code=502, detail="Could not reach the update server") from exc
+
+    tag = str(release.get("tag_name", "")).lstrip("vV")
+    asset = platform_asset(release.get("assets") or [])
+    available = bool(tag) and is_newer(tag, app.version) and asset is not None
+    return {
+        "current": app.version,
+        "latest": tag or app.version,
+        "update_available": available,
+        # Installing in place only makes sense inside the frozen desktop app;
+        # from source the interface just links to the releases page instead.
+        "can_install": bool(getattr(sys, "frozen", False)),
+        "notes_url": release.get("html_url") or GITHUB_RELEASES_PAGE,
+        "asset_name": asset["name"] if asset else None,
+        "asset_bytes": asset.get("size") if asset else None,
+    }
+
+
+def download_installer(asset: dict) -> Path:
+    """Stream the release installer to a local file and return its path."""
+
+    name = safe_filename(asset.get("name") or "MathOCR-Update")
+    # macOS keeps the .dmg in Downloads (the user drags it); Windows only needs
+    # the installer briefly, so a temp folder is enough.
+    target_dir = Path.home() / "Downloads" if sys.platform == "darwin" else Path(tempfile.gettempdir())
+    target_dir.mkdir(parents=True, exist_ok=True)
+    destination = target_dir / name
+    request = urllib.request.Request(
+        asset["browser_download_url"], headers={"User-Agent": model_store.USER_AGENT}
+    )
+    with urllib.request.urlopen(request, timeout=600) as response, open(destination, "wb") as sink:
+        shutil.copyfileobj(response, sink, length=1024 * 256)
+    return destination
+
+
+def launch_installer_and_exit(installer: Path) -> None:
+    """Start the installer, then quit so it can replace the running files."""
+
+    if sys.platform == "win32":
+        flags = getattr(subprocess, "DETACHED_PROCESS", 0) | getattr(
+            subprocess, "CREATE_NEW_PROCESS_GROUP", 0
+        )
+        subprocess.Popen([str(installer)], creationflags=flags, close_fds=True)
+    elif sys.platform == "darwin":
+        subprocess.Popen(["open", str(installer)])
+    # Let the HTTP response flush before the process dies. os._exit tears down
+    # both Uvicorn and the webview window, so the app closes and the installer
+    # (Windows) or the user's drag-to-Applications (macOS) can proceed.
+    threading.Timer(2.5, os._exit, args=[0]).start()
+
+
+@app.post("/api/update/install")
+async def update_install() -> dict[str, object]:
+    """Download the newest installer and launch it, then close the app."""
+
+    if not getattr(sys, "frozen", False):
+        raise HTTPException(
+            status_code=422, detail="Automatic update is only available in the packaged app"
+        )
+    if sys.platform not in ("win32", "darwin"):
+        raise HTTPException(
+            status_code=422, detail="Automatic update is not supported on this platform"
+        )
+
+    try:
+        release = await run_in_threadpool(fetch_latest_release)
+        asset = platform_asset(release.get("assets") or [])
+        if not asset:
+            raise HTTPException(status_code=404, detail="No installer is available for this system")
+        installer = await run_in_threadpool(download_installer, asset)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.exception("Update download failed")
+        raise HTTPException(
+            status_code=502, detail=f"Update download failed: {type(exc).__name__}: {exc}"
+        ) from exc
+
+    launch_installer_and_exit(installer)
+    return {"launched": True, "platform": sys.platform}
 
 
 def markdown_document(request: DocxRequest) -> str:

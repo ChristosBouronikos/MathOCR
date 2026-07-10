@@ -124,6 +124,21 @@ h2 { font-size: clamp(1.5rem, 3vw, 2rem); }
 }
 .engine-banner a:hover { background: #d75f41; }
 
+.update-banner {
+  display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;
+  margin-bottom: 16px; padding: 14px 18px;
+  border: 1px solid #bfe0d3; border-radius: 12px;
+  background: #eef7f2; font-size: 0.8rem;
+}
+.update-copy strong { display: block; }
+.update-copy span { color: var(--muted); }
+.update-actions { display: flex; align-items: center; gap: 14px; flex-shrink: 0; }
+.update-actions a {
+  color: var(--green); font-size: 0.74rem; font-weight: 800; text-decoration: none; white-space: nowrap;
+}
+.update-actions a:hover { text-decoration: underline; }
+.update-actions .primary-button { padding: 9px 16px; font-size: 0.74rem; }
+
 /* ---------- workspace ---------- */
 
 .workspace {

@@ -17,9 +17,9 @@
     <meta name="theme-color" content="#f5f1e8" />
     <title>MathOCR by Bouronikos Christos</title>
     <link rel="stylesheet" href="./vendor/katex/katex.min.css" />
-    <link rel="stylesheet" href="./styles.css?v=1.0.2" />
+    <link rel="stylesheet" href="./styles.css?v=1.0.4" />
     <script defer src="./vendor/katex/katex.min.js"></script>
-    <script defer src="./app.js?v=1.0.2"></script>
+    <script defer src="./app.js?v=1.0.4"></script>
   </head>
   <body>
     <header class="site-header">
@@ -64,6 +64,17 @@
           target="_blank"
           rel="noopener noreferrer"
         ><span data-i18n="engineBannerAction">Get the desktop app</span> ↗</a>
+      </section>
+
+      <section class="update-banner" id="updateBanner" hidden>
+        <div class="update-copy">
+          <strong data-i18n="updateTitle">A new version is available</strong>
+          <span id="updateDetail"></span>
+        </div>
+        <div class="update-actions">
+          <a id="updateNotesLink" href="#" target="_blank" rel="noopener noreferrer" data-i18n="updateNotes">Release notes ↗</a>
+          <button class="primary-button" id="updateButton" type="button" data-i18n="updateNow">Update now</button>
+        </div>
       </section>
 
       <section class="workspace" aria-label="Recognition workspace">
@@ -213,7 +224,7 @@
       </div>
       <div class="footer-legal">
         <span>© 2026 Bouronikos Christos · <span data-i18n="footerLicense">MIT License</span></span>
-        <span>MathOCR <span id="footerVersion">1.0.2</span> · <span data-i18n="footerMadeWith">made for students, teachers, and researchers</span></span>
+        <span>MathOCR <span id="footerVersion">1.0.4</span> · <span data-i18n="footerMadeWith">made for students, teachers, and researchers</span></span>
       </div>
     </footer>
 

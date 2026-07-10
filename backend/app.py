@@ -43,8 +43,10 @@ from backend.engines import (  # noqa: E402  (environment must be configured fir
     ENGINE_ORDER,
     EngineRegistry,
     MathPipeline,
+    can_install_packages,
     installed_engine_ids,
     nougat_available,
+    nougat_ready,
     text_engine_available,
 )
 
@@ -203,6 +205,10 @@ class EngineStorage(BaseModel):
     installed: bool
     loaded: bool
     bytes: int
+    # ``downloadable`` marks an optional engine (Nougat) the user can fetch with
+    # a button; ``ready`` means it is fully installed and usable right now.
+    downloadable: bool = False
+    ready: bool = True
 
 
 class ModelsResponse(BaseModel):
@@ -233,6 +239,8 @@ def health() -> dict[str, object]:
         "loaded_engines": registry.loaded,
         "text_available": text_engine_available(),
         "nougat_available": nougat_available(),
+        "nougat_ready": nougat_ready(),
+        "nougat_installable": can_install_packages(),
         "author": AUTHOR,
         "donate": DONATION_URL,
     }
@@ -408,13 +416,14 @@ def models_inventory() -> ModelsResponse:
     installed = set(installed_engine_ids())
     loaded = set(registry.loaded)
     text_ready = text_engine_available()
-    nougat_ready = nougat_available()
+    nougat_installed = nougat_available()
+    nougat_is_ready = nougat_ready()
 
     def is_installed(component: str) -> bool:
         if component == "tesseract":
             return text_ready
         if component == "nougat":
-            return nougat_ready
+            return nougat_installed
         return component in installed
 
     engines = [
@@ -423,8 +432,10 @@ def models_inventory() -> ModelsResponse:
             label=ENGINE_LABELS[component],
             role=_component_role(component),
             installed=is_installed(component),
-            loaded=component in loaded or (component == "pix2text-mfr" and "pix2text-mfr" in loaded),
+            loaded=component in loaded,
             bytes=sizes.get(_storage_key(component), 0),
+            downloadable=(component == "nougat"),
+            ready=(nougat_is_ready if component == "nougat" else is_installed(component)),
         )
         for component in STORAGE_COMPONENTS
     ]
@@ -484,6 +495,58 @@ async def download_models() -> dict[str, object]:
     except Exception as exc:
         raise HTTPException(status_code=502, detail=f"Model download failed: {type(exc).__name__}") from exc
     return {"prepared": prepared}
+
+
+NOUGAT_PIP_TARGET = "nougat-ocr>=0.1.17,<1"
+
+
+@app.post("/api/models/nougat/install")
+async def install_nougat() -> dict[str, object]:
+    """Install the optional Nougat engine on demand, from a UI button.
+
+    Installs the ``nougat-ocr`` package if it is missing (only possible when
+    MathOCR runs from a normal Python, not a frozen bundle) and then downloads
+    its checkpoint. The weights are CC-BY-NC, so this only runs when the user
+    explicitly asks for it. Once finished, Nougat appears in the document
+    reader menu.
+    """
+
+    def work() -> dict[str, object]:
+        import importlib
+
+        if not nougat_available():
+            if not can_install_packages():
+                raise RuntimeError(
+                    "Nougat cannot be installed into the packaged app. Run MathOCR "
+                    "from source (run.command / run.bat) to add it, or use a "
+                    "Nougat-enabled build."
+                )
+            completed = subprocess.run(
+                [sys.executable, "-m", "pip", "install", NOUGAT_PIP_TARGET],
+                capture_output=True,
+                text=True,
+                timeout=1800,
+                check=False,
+            )
+            if completed.returncode != 0:
+                raise RuntimeError(completed.stderr.strip()[-500:] or "pip install failed")
+            importlib.invalidate_caches()
+
+        model_store.ensure_nougat_model()
+        registry.unload_all()  # pick up the newly available package on next use
+        return {"ready": nougat_ready()}
+
+    try:
+        result = await run_in_threadpool(work)
+    except subprocess.TimeoutExpired as exc:
+        raise HTTPException(status_code=504, detail="Nougat installation timed out") from exc
+    except RuntimeError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(
+            status_code=502, detail=f"Nougat installation failed: {type(exc).__name__}"
+        ) from exc
+    return result
 
 
 @app.delete("/api/models", response_model=DeleteModelsResponse)

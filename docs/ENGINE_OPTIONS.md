@@ -12,7 +12,7 @@ MathOCR runs several recognizers locally. Math formulas are read by an **ensembl
 | `pix2tex` | [pix2tex / LaTeX-OCR](https://github.com/lukas-blecher/LaTeX-OCR) | MIT | Second opinion (different architecture) | ≈ 115 MB |
 | `rapid-latex` | [RapidLaTeXOCR](https://github.com/RapidAI/RapidLatexOCR) (ONNX) | Apache-2.0 | Fast tie-breaker; same family as pix2tex so its agreement is discounted | ≈ 170 MB |
 | `tesseract` | [Tesseract](https://github.com/tesseract-ocr/tesseract) `ell+eng` | Apache-2.0 | Page text for **document** mode (Greek + English) | ≈ 5 MB data + program |
-| `nougat` *(optional)* | [Nougat](https://github.com/facebookresearch/nougat) | code MIT / weights CC-BY-NC | Alternative English document reader; **never bundled** | ≈ 1.4 GB |
+| `nougat` *(optional)* | [Nougat](https://github.com/facebookresearch/nougat) | code MIT / weights CC-BY-NC | Alternative English document reader; **never bundled** — fetched from the in-app **Download** button (`POST /api/models/nougat/install`, which pip-installs the package and downloads the weights). Only enabled in the document-reader menu once ready. | ≈ 1.4 GB |
 
 ## Modes
 

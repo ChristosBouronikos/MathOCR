@@ -150,6 +150,45 @@ def test_models_deletion_rejects_unknown_engine() -> None:
     assert response.status_code == 404
 
 
+def test_models_inventory_marks_nougat_downloadable() -> None:
+    response = client.get("/api/models")
+    nougat = next(e for e in response.json()["engines"] if e["id"] == "nougat")
+    assert nougat["role"] == "optional"
+    assert nougat["downloadable"] is True
+    # With the package absent in CI, Nougat is not ready to use yet.
+    assert nougat["ready"] is False
+
+
+def test_install_nougat_downloads_weights_when_package_present(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import backend.app as app_module
+
+    calls = {"weights": 0}
+
+    monkeypatch.setattr(app_module, "nougat_available", lambda: True)
+    monkeypatch.setattr(app_module, "nougat_ready", lambda: True)
+    monkeypatch.setattr(
+        app_module.model_store,
+        "ensure_nougat_model",
+        lambda: calls.__setitem__("weights", calls["weights"] + 1),
+    )
+    response = client.post("/api/models/nougat/install")
+    assert response.status_code == 200
+    assert response.json()["ready"] is True
+    assert calls["weights"] == 1
+
+
+def test_install_nougat_refuses_inside_frozen_app(monkeypatch: pytest.MonkeyPatch) -> None:
+    import backend.app as app_module
+
+    monkeypatch.setattr(app_module, "nougat_available", lambda: False)
+    monkeypatch.setattr(app_module, "can_install_packages", lambda: False)
+    response = client.post("/api/models/nougat/install")
+    assert response.status_code == 422
+    assert "packaged app" in response.json()["detail"]
+
+
 def test_store_entries_include_legacy_pix2text(monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
     root = tmp_path / "models"
     monkeypatch.setenv("MATHOCR_MODEL_DIR", str(root))

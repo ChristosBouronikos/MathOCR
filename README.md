@@ -56,7 +56,7 @@ You can keep the default (**Best — cross-check all**) or pick a single engine 
 - The installed application is roughly **1.5–2 GB** (it bundles Python and the OCR libraries).
 - Recognition models are downloaded on first use into a per-user folder:
   - Pix2Text MFR-1.5 ≈ **190 MB**, pix2tex ≈ **115 MB**, RapidLaTeXOCR ≈ **170 MB**, Tesseract (Greek + English) ≈ **5 MB** → **about 480 MB total**.
-  - Optional Nougat weights (English papers) add ≈ **1.4 GB** and are only downloaded if you install and enable it.
+  - Optional Nougat (English papers) adds ≈ **1.4 GB** and is only fetched when you press its **Download** button in the model panel. When running from source, that button installs the engine and its weights for you; the packaged app needs a Nougat-enabled build or a source run to add it.
 - You can delete any model from the app's **"Models on this computer"** panel to reclaim the space; it re-downloads automatically when next needed.
 
 Models are stored in:
@@ -168,7 +168,7 @@ MathOCR is released under the [MIT License](LICENSE) — © 2026 **Bouronikos Ch
 - Η εγκατεστημένη εφαρμογή είναι περίπου **1,5–2 GB** (περιλαμβάνει την Python και τις βιβλιοθήκες OCR).
 - Τα μοντέλα αναγνώρισης κατεβαίνουν στην πρώτη χρήση σε φάκελο του χρήστη:
   - Pix2Text MFR-1.5 ≈ **190 MB**, pix2tex ≈ **115 MB**, RapidLaTeXOCR ≈ **170 MB**, Tesseract (Ελληνικά + Αγγλικά) ≈ **5 MB** → **περίπου 480 MB συνολικά**.
-  - Τα προαιρετικά βάρη του Nougat (αγγλικές εργασίες) προσθέτουν ≈ **1,4 GB** και κατεβαίνουν μόνο αν το εγκαταστήσετε και το ενεργοποιήσετε.
+  - Το προαιρετικό Nougat (αγγλικές εργασίες) προσθέτει ≈ **1,4 GB** και κατεβαίνει μόνο όταν πατήσετε το κουμπί **Λήψη** στο πλαίσιο μοντέλων. Όταν εκτελείτε από τον πηγαίο κώδικα, το κουμπί εγκαθιστά τη μηχανή και τα βάρη της· η εφαρμογή χρειάζεται έκδοση με ενσωματωμένο Nougat ή εκτέλεση από πηγαίο κώδικα για να το προσθέσει.
 - Μπορείτε να διαγράψετε οποιοδήποτε μοντέλο από το πλαίσιο **«Μοντέλα σε αυτόν τον υπολογιστή»** για να ελευθερώσετε χώρο· κατεβαίνει ξανά αυτόματα όταν χρειαστεί.
 
 Τα μοντέλα αποθηκεύονται στο:

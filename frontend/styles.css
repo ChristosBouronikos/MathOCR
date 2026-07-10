@@ -266,8 +266,11 @@ h2 { font-size: clamp(1.5rem, 3vw, 2rem); }
 .result-actions { display: flex; justify-content: space-between; gap: 8px; margin-top: 8px; }
 .mini-button { border: 0; padding: 4px 0; color: var(--green); background: none; cursor: pointer; font-size: 0.68rem; font-weight: 900; }
 .mini-button.danger { color: var(--danger); }
+.mini-button.install { color: #fff; background: var(--green); border-radius: 999px; padding: 5px 14px; }
+.mini-button.install:hover:not(:disabled) { background: var(--green-dark); }
 .mini-button:disabled { opacity: 0.35; cursor: not-allowed; }
 .mini-button.armed { color: #fff; background: var(--danger); border-radius: 999px; padding: 4px 10px; }
+.storage-action { display: flex; justify-content: flex-end; min-width: 92px; }
 
 /* ---------- reconstructed document ---------- */
 

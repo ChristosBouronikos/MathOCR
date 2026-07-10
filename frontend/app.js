@@ -48,7 +48,8 @@ const translations = {
     engineRapid: "RapidLaTeXOCR",
     docReader: "Text reader (document mode)",
     docLayout: "Greek + English (Tesseract)",
-    docNougat: "Nougat — English papers (optional)",
+    docNougat: "Nougat — English papers",
+    docNougatUnavailable: "Nougat — download it below first",
     pageLimit: "PDF page limit",
     recognize: "Recognize mathematics",
     engineAddress: "Advanced: engine address",
@@ -104,8 +105,15 @@ const translations = {
     storagePath: "Storage folder",
     storageNotInstalled: "not installed",
     storageEmpty: "not downloaded",
+    storageReady: "ready",
     storageLoaded: "in memory",
-    storageOptionalHint: "optional · run: pip install nougat-ocr",
+    storageOptional: "optional · English documents",
+    storageWeightsMissing: "installed · weights not downloaded",
+    downloadModel: "Download",
+    installingNougat: "Installing Nougat… downloads ~1.4 GB, several minutes",
+    nougatReady: "Nougat is ready — select it in the document reader menu",
+    nougatInstallFailed: "Nougat installation failed",
+    nougatNeedsSource: "Available when running MathOCR from source",
     role_math: "math",
     role_text: "text",
     role_optional: "optional",
@@ -158,7 +166,8 @@ const translations = {
     engineRapid: "RapidLaTeXOCR",
     docReader: "Ανάγνωση κειμένου (λειτουργία εγγράφου)",
     docLayout: "Ελληνικά + Αγγλικά (Tesseract)",
-    docNougat: "Nougat — αγγλικές εργασίες (προαιρετικό)",
+    docNougat: "Nougat — αγγλικές εργασίες",
+    docNougatUnavailable: "Nougat — κατεβάστε το πρώτα πιο κάτω",
     pageLimit: "Όριο σελίδων PDF",
     recognize: "Αναγνώριση μαθηματικών",
     engineAddress: "Για προχωρημένους: διεύθυνση μηχανής",
@@ -214,8 +223,15 @@ const translations = {
     storagePath: "Φάκελος αποθήκευσης",
     storageNotInstalled: "μη εγκατεστημένη",
     storageEmpty: "δεν έχει κατέβει",
+    storageReady: "έτοιμο",
     storageLoaded: "στη μνήμη",
-    storageOptionalHint: "προαιρετικό · εκτελέστε: pip install nougat-ocr",
+    storageOptional: "προαιρετικό · αγγλικά έγγραφα",
+    storageWeightsMissing: "εγκατεστημένο · δεν έχουν κατέβει τα βάρη",
+    downloadModel: "Λήψη",
+    installingNougat: "Εγκατάσταση Nougat… κατεβάζει ~1,4 GB, μερικά λεπτά",
+    nougatReady: "Το Nougat είναι έτοιμο — επιλέξτε το στο μενού ανάγνωσης εγγράφου",
+    nougatInstallFailed: "Η εγκατάσταση του Nougat απέτυχε",
+    nougatNeedsSource: "Διαθέσιμο όταν το MathOCR εκτελείται από τον πηγαίο κώδικα",
     role_math: "μαθηματικά",
     role_text: "κείμενο",
     role_optional: "προαιρετικό",
@@ -257,6 +273,8 @@ const state = {
   pandoc: false,
   textAvailable: false,
   nougatAvailable: false,
+  nougatReady: false,
+  nougatInstallable: false,
   busy: false,
   language: initialLanguage,
   storage: null,
@@ -355,6 +373,8 @@ async function checkService() {
     state.pandoc = Boolean(health.pandoc);
     state.textAvailable = Boolean(health.text_available);
     state.nougatAvailable = Boolean(health.nougat_available);
+    state.nougatReady = Boolean(health.nougat_ready);
+    state.nougatInstallable = Boolean(health.nougat_installable);
     elements.servicePill.classList.add("online");
     refreshStorage();
   } catch (_error) {
@@ -362,6 +382,8 @@ async function checkService() {
     state.pandoc = false;
     state.textAvailable = false;
     state.nougatAvailable = false;
+    state.nougatReady = false;
+    state.nougatInstallable = false;
     state.storage = null;
     elements.servicePill.classList.add("offline");
     renderStorage();
@@ -376,11 +398,12 @@ async function checkService() {
 function updateModeOptions() {
   const isDocument = elements.recognitionMode.value === "document";
   elements.docEngineField.hidden = !isDocument;
-  // Nougat is selectable only when its optional package is installed.
+  // Nougat is selectable only once it is fully downloaded and ready.
   const nougatOption = elements.docEngine.querySelector('option[value="nougat"]');
   if (nougatOption) {
-    nougatOption.disabled = !state.nougatAvailable;
-    if (!state.nougatAvailable && elements.docEngine.value === "nougat") {
+    nougatOption.disabled = !state.nougatReady;
+    nougatOption.textContent = state.nougatReady ? t("docNougat") : t("docNougatUnavailable");
+    if (!state.nougatReady && elements.docEngine.value === "nougat") {
       elements.docEngine.value = "layout";
     }
   }
@@ -777,25 +800,57 @@ function renderStorage() {
     row.innerHTML = `
       <div class="storage-name"><strong></strong><span class="storage-role"></span><span class="storage-status"></span></div>
       <span class="storage-size"></span>
-      <button class="mini-button danger" type="button"></button>`;
+      <span class="storage-action"></span>`;
     row.querySelector("strong").textContent = engine.label;
     const roleTag = row.querySelector(".storage-role");
     roleTag.textContent = t(`role_${engine.role}`);
     roleTag.classList.add(`role-${engine.role}`);
     const status = row.querySelector(".storage-status");
-    if (!engine.installed) {
-      status.textContent = engine.role === "optional" ? t("storageOptionalHint") : t("storageNotInstalled");
-    } else if (engine.loaded) {
-      status.textContent = t("storageLoaded");
-    } else if (!engine.bytes) {
-      status.textContent = t("storageEmpty");
+    const action = row.querySelector(".storage-action");
+
+    // Nougat, and any other optional engine, can be fetched with a button.
+    if (engine.downloadable && !engine.ready) {
+      status.textContent = engine.installed ? t("storageWeightsMissing") : t("storageOptional");
+      row.querySelector(".storage-size").textContent = "—";
+      const installButton = document.createElement("button");
+      installButton.type = "button";
+      installButton.className = "mini-button install";
+      installButton.textContent = t("downloadModel");
+      installButton.disabled = !state.nougatInstallable && !engine.installed;
+      if (installButton.disabled) installButton.title = t("nougatNeedsSource");
+      installButton.addEventListener("click", installNougat);
+      action.append(installButton);
+      list.append(row);
+      continue;
     }
+
+    if (engine.loaded) status.textContent = t("storageLoaded");
+    else if (engine.ready && !engine.bytes) status.textContent = t("storageReady");
+    else if (!engine.installed) status.textContent = t("storageNotInstalled");
+    else if (!engine.bytes) status.textContent = t("storageEmpty");
     row.querySelector(".storage-size").textContent = engine.bytes ? humanBytes(engine.bytes) : "—";
-    const deleteButton = row.querySelector("button");
+
+    const deleteButton = document.createElement("button");
+    deleteButton.type = "button";
+    deleteButton.className = "mini-button danger";
     deleteButton.textContent = t("deleteModel");
     deleteButton.disabled = !engine.bytes;
     armConfirm(deleteButton, () => deleteModels(engine.id === "pix2text-mfr" ? "pix2text" : engine.id));
+    action.append(deleteButton);
     list.append(row);
+  }
+}
+
+async function installNougat() {
+  showToast(t("installingNougat"));
+  try {
+    const response = await fetch(`${normalizedApiUrl()}/api/models/nougat/install`, { method: "POST" });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(payload.detail || t("nougatInstallFailed"));
+    await checkService(); // refresh readiness so the dropdown enables Nougat
+    showToast(state.nougatReady ? t("nougatReady") : t("nougatInstallFailed"));
+  } catch (error) {
+    showToast(error.message || t("nougatInstallFailed"));
   }
 }
 

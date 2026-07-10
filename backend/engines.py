@@ -374,9 +374,31 @@ def text_engine_available() -> bool:
 
 
 def nougat_available() -> bool:
-    """True when the optional Nougat package is installed."""
+    """True when the optional Nougat package is importable."""
 
     return importlib.util.find_spec("nougat") is not None
+
+
+def nougat_ready() -> bool:
+    """True when Nougat can actually run: package installed and weights present."""
+
+    if not nougat_available():
+        return False
+    from backend import model_store
+
+    weights_dir = model_store.default_cache_root() / "nougat"
+    return model_store.directory_size(weights_dir) > 0
+
+
+def can_install_packages() -> bool:
+    """Whether new Python packages can be pip-installed at runtime.
+
+    False inside a frozen PyInstaller bundle, where ``sys.executable`` is the
+    app itself and site-packages is read-only. In that case Nougat has to be
+    part of the build (or run from source) rather than added on demand.
+    """
+
+    return not getattr(sys, "frozen", False)
 
 
 class EngineRegistry:

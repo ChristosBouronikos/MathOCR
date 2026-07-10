@@ -13,6 +13,7 @@ documents through Pandoc, and manages the on-disk model storage.
 from __future__ import annotations
 
 import io
+import logging
 import os
 import re
 import shutil
@@ -37,6 +38,17 @@ from backend import model_store
 # Engine caches must be redirected below the MathOCR model folder before any
 # ML package gets imported, otherwise they fall back to scattered defaults.
 model_store.configure_model_environment()
+
+# The desktop app has no visible console, so a log file next to the model
+# cache is the only way a user can hand us a traceback when something fails.
+_log_path = model_store.default_cache_root().parent / "logs" / "mathocr.log"
+_log_path.parent.mkdir(parents=True, exist_ok=True)
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+    handlers=[logging.FileHandler(_log_path, encoding="utf-8"), logging.StreamHandler()],
+)
+logger = logging.getLogger("mathocr")
 
 from backend.engines import (  # noqa: E402  (environment must be configured first)
     ENGINE_LABELS,
@@ -243,6 +255,7 @@ def health() -> dict[str, object]:
         "nougat_installable": can_install_packages(),
         "author": AUTHOR,
         "donate": DONATION_URL,
+        "log_file": str(_log_path),
     }
 
 
@@ -400,8 +413,13 @@ async def ocr(
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     except Exception as exc:
-        # The full exception remains chained for server logs; clients receive a useful safe message.
-        raise HTTPException(status_code=500, detail=f"Recognition failed: {type(exc).__name__}") from exc
+        # This is a local desktop app processing the user's own files, so the
+        # real message (often a missing model path) is safe to show and is
+        # the only diagnostic a user without a visible console can report.
+        logger.exception("Recognition failed for %s", [name for name, _ in uploads])
+        raise HTTPException(
+            status_code=500, detail=f"Recognition failed: {type(exc).__name__}: {exc}"
+        ) from exc
     return OcrResponse(results=results, documents=documents, warnings=warnings)
 
 
@@ -493,7 +511,10 @@ async def download_models() -> dict[str, object]:
     try:
         prepared = await run_in_threadpool(fetch)
     except Exception as exc:
-        raise HTTPException(status_code=502, detail=f"Model download failed: {type(exc).__name__}") from exc
+        logger.exception("Model download failed")
+        raise HTTPException(
+            status_code=502, detail=f"Model download failed: {type(exc).__name__}: {exc}"
+        ) from exc
     return {"prepared": prepared}
 
 
@@ -543,8 +564,9 @@ async def install_nougat() -> dict[str, object]:
     except RuntimeError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     except Exception as exc:
+        logger.exception("Nougat installation failed")
         raise HTTPException(
-            status_code=502, detail=f"Nougat installation failed: {type(exc).__name__}"
+            status_code=502, detail=f"Nougat installation failed: {type(exc).__name__}: {exc}"
         ) from exc
     return result
 

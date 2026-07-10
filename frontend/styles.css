@@ -190,7 +190,7 @@ h2 { font-size: clamp(1.5rem, 3vw, 2rem); }
 .word-button { border-color: #2167d5; background: #2167d5; }
 .word-button:hover:not(:disabled) { border-color: #174fa9; background: #174fa9; }
 
-.recognize-button { width: 100%; margin-top: 16px; justify-content: space-between; font-size: 0.82rem; }
+.recognize-button { width: auto; margin-top: 16px; justify-content: center; font-size: 0.82rem; }
 
 .advanced { margin-top: 16px; color: var(--muted); font-size: 0.72rem; }
 .advanced summary { cursor: pointer; font-weight: 800; }

@@ -575,7 +575,7 @@ def markdown_document(request: DocxRequest) -> str:
 
     A ``markdown`` payload (document mode) is used verbatim under the title so
     body text and equations both survive to Word; otherwise the equations are
-    stacked as display-math blocks.
+    stacked as display-math blocks with proper spacing for math recognition.
     """
 
     safe_title = request.title.replace("\n", " ").strip() or "MathOCR equations"
@@ -584,7 +584,10 @@ def markdown_document(request: DocxRequest) -> str:
         blocks.append(request.markdown.strip())
     else:
         for equation in request.equations:
-            blocks.extend(("$$", equation, "$$", ""))
+            clean_eq = equation.strip()
+            if clean_eq.startswith("$$") and clean_eq.endswith("$$"):
+                clean_eq = clean_eq[2:-2].strip()
+            blocks.extend(("", "$$", clean_eq, "$$", ""))
     return "\n".join(blocks)
 
 

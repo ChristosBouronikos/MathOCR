@@ -25,6 +25,7 @@ const translations = {
   en: {
     pageTitle: "MathOCR by Bouronikos Christos",
     brandBy: "by Bouronikos Christos",
+    refreshPage: "Refresh",
     serviceChecking: "Checking engine…",
     serviceReady: "Local engine ready",
     serviceNoPandoc: "OCR ready · Pandoc missing",
@@ -143,6 +144,7 @@ const translations = {
   el: {
     pageTitle: "MathOCR από τον Χρήστο Μπουρονίκο",
     brandBy: "από τον Χρήστο Μπουρονίκο",
+    refreshPage: "Ανανέωση",
     serviceChecking: "Έλεγχος μηχανής…",
     serviceReady: "Η τοπική μηχανή είναι έτοιμη",
     serviceNoPandoc: "OCR έτοιμο · λείπει το Pandoc",
@@ -294,7 +296,7 @@ for (const id of [
   "downloadModelsButton", "downloadDocWordButton", "downloadTexButton", "downloadWordButton",
   "dropZone", "engineBanner", "engineBannerLink", "advancedSettings", "docEngine", "docEngineField",
   "documentList", "documentSection", "fileInput", "fileList", "footerVersion", "mathEngine",
-  "pageLimit", "progressPanel", "recognitionMode", "recognizeButton", "recheckButton",
+  "pageLimit", "progressPanel", "recognitionMode", "recognizeButton", "recheckButton", "refreshPageButton",
   "resultList", "resultsSection", "resultsSummary", "servicePill", "serviceText", "storageList",
   "storagePathValue", "storageSection", "storageTotalBytes", "toast",
 ]) {
@@ -808,8 +810,9 @@ function renderStorage() {
     const status = row.querySelector(".storage-status");
     const action = row.querySelector(".storage-action");
 
-    // Nougat, and any other optional engine, can be fetched with a button.
-    if (engine.downloadable && !engine.ready) {
+    // Nougat needs its optional package installed first; every other engine
+    // is bundled with the app and can be fetched directly.
+    if (engine.id === "nougat" && !engine.ready) {
       status.textContent = engine.installed ? t("storageWeightsMissing") : t("storageOptional");
       row.querySelector(".storage-size").textContent = "—";
       const installButton = document.createElement("button");
@@ -829,6 +832,15 @@ function renderStorage() {
     else if (!engine.installed) status.textContent = t("storageNotInstalled");
     else if (!engine.bytes) status.textContent = t("storageEmpty");
     row.querySelector(".storage-size").textContent = engine.bytes ? humanBytes(engine.bytes) : "—";
+
+    const downloadButton = document.createElement("button");
+    downloadButton.type = "button";
+    downloadButton.className = "mini-button install";
+    downloadButton.textContent = t("downloadModel");
+    downloadButton.disabled = state.busy || !engine.ready;
+    if (!engine.ready) downloadButton.title = t("storageNotInstalled");
+    downloadButton.addEventListener("click", () => downloadEngine(engine.id, downloadButton));
+    action.append(downloadButton);
 
     const deleteButton = document.createElement("button");
     deleteButton.type = "button";
@@ -919,6 +931,26 @@ async function downloadModels() {
   }
 }
 
+async function downloadEngine(engineId, button) {
+  button.disabled = true;
+  const original = button.textContent;
+  button.textContent = t("downloadingModels");
+  try {
+    const response = await fetch(
+      `${normalizedApiUrl()}/api/models/download?engine=${encodeURIComponent(engineId)}`,
+      { method: "POST" }
+    );
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(payload.detail || `HTTP ${response.status}`);
+    await refreshStorage();
+    showToast(t("modelsReady", { size: humanBytes(state.storage ? state.storage.total_bytes : 0) }));
+  } catch (error) {
+    showToast(error.message || t("modelsDownloadFailed"));
+  } finally {
+    renderStorage(); // rebuilds the row, so no need to restore original/disabled here
+  }
+}
+
 /* ---------- events ---------- */
 
 elements.fileInput.addEventListener("change", (event) => {
@@ -963,6 +995,7 @@ elements.recognitionMode.addEventListener("change", updateModeOptions);
 elements.copyDocButton.addEventListener("click", () => copyText(documentMarkdown(), t("documentCopied")));
 elements.downloadDocWordButton.addEventListener("click", downloadDocumentWord);
 elements.recheckButton.addEventListener("click", checkService);
+elements.refreshPageButton.addEventListener("click", () => location.reload());
 elements.apiUrl.addEventListener("change", () => {
   localStorage.setItem("mathocr-api-url", normalizedApiUrl());
   checkService();

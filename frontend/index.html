@@ -17,9 +17,9 @@
     <meta name="theme-color" content="#f5f1e8" />
     <title>MathOCR by Bouronikos Christos</title>
     <link rel="stylesheet" href="./vendor/katex/katex.min.css" />
-    <link rel="stylesheet" href="./styles.css?v=1.0.1" />
+    <link rel="stylesheet" href="./styles.css?v=1.0.2" />
     <script defer src="./vendor/katex/katex.min.js"></script>
-    <script defer src="./app.js?v=1.0.1"></script>
+    <script defer src="./app.js?v=1.0.2"></script>
   </head>
   <body>
     <header class="site-header">
@@ -31,6 +31,10 @@
         </span>
       </a>
       <div class="header-controls">
+        <button class="refresh-button" id="refreshPageButton" type="button">
+          <span aria-hidden="true">⟳</span>
+          <span data-i18n="refreshPage">Refresh</span>
+        </button>
         <div class="language-switch" role="group" aria-label="Language / Γλώσσα">
           <button type="button" data-language="en" aria-pressed="true">EN</button>
           <button type="button" data-language="el" aria-pressed="false">ΕΛ</button>
@@ -209,7 +213,7 @@
       </div>
       <div class="footer-legal">
         <span>© 2026 Bouronikos Christos · <span data-i18n="footerLicense">MIT License</span></span>
-        <span>MathOCR <span id="footerVersion">1.0.1</span> · <span data-i18n="footerMadeWith">made for students, teachers, and researchers</span></span>
+        <span>MathOCR <span id="footerVersion">1.0.2</span> · <span data-i18n="footerMadeWith">made for students, teachers, and researchers</span></span>
       </div>
     </footer>
 

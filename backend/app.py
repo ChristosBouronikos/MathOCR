@@ -117,7 +117,7 @@ def find_pandoc() -> str | None:
 app = FastAPI(
     title="MathOCR local API",
     description="Local image/PDF mathematics recognition and editable Word equation export.",
-    version="1.0.1",
+    version="1.0.2",
     contact={"name": AUTHOR, "email": AUTHOR_EMAIL, "url": DONATION_URL},
 )
 
@@ -452,7 +452,9 @@ def models_inventory() -> ModelsResponse:
             installed=is_installed(component),
             loaded=component in loaded,
             bytes=sizes.get(_storage_key(component), 0),
-            downloadable=(component == "nougat"),
+            # Every engine can be pre-fetched with its own button; Nougat is
+            # additionally gated on its optional package being installed first.
+            downloadable=True,
             ready=(nougat_is_ready if component == "nougat" else is_installed(component)),
         )
         for component in STORAGE_COMPONENTS
@@ -478,38 +480,62 @@ def _storage_key(component: str) -> str:
     return "pix2text" if component == "pix2text-mfr" else component
 
 
+def _fetch_component(component: str) -> bool:
+    """Download one component's files if its package/program is available.
+
+    Returns whether anything was (or already is) fetched, so callers can
+    report which components were skipped (package not installed).
+    """
+
+    if component == "pix2text-mfr":
+        if "pix2text-mfr" not in installed_engine_ids():
+            return False
+        model_store.ensure_pix2text_models()
+        return True
+    if component == "pix2tex":
+        if "pix2tex" not in installed_engine_ids():
+            return False
+        model_store.ensure_pix2tex_weights()
+        return True
+    if component == "rapid-latex":
+        if "rapid-latex" not in installed_engine_ids():
+            return False
+        model_store.ensure_rapid_latex_weights()
+        return True
+    if component == "tesseract":
+        if not text_engine_available():
+            return False
+        model_store.ensure_tesseract_langs()
+        return True
+    if component == "nougat":
+        # Nougat is fetched only when its optional package is installed; its
+        # non-commercial weights are never downloaded implicitly otherwise.
+        if not nougat_available():
+            return False
+        model_store.ensure_nougat_model()
+        return True
+    raise HTTPException(status_code=404, detail=f"Unknown engine: {component}")
+
+
 @app.post("/api/models/download")
-async def download_models() -> dict[str, object]:
-    """Fetch every installed engine's model files ahead of first recognition.
+async def download_models(engine: str | None = None) -> dict[str, object]:
+    """Fetch one engine's model files, or every installed engine's.
 
     This can take several minutes on a slow connection; the interface presents
     it as an explicit "prepare models" step so first OCR feels instant.
     """
 
+    if engine is not None and engine not in STORAGE_COMPONENTS:
+        raise HTTPException(status_code=404, detail=f"Unknown engine: {engine}")
+
     def fetch() -> list[str]:
-        prepared: list[str] = []
-        installed = set(installed_engine_ids())
-        if "pix2text-mfr" in installed:
-            model_store.ensure_pix2text_models()
-            prepared.append("pix2text-mfr")
-        if "pix2tex" in installed:
-            model_store.ensure_pix2tex_weights()
-            prepared.append("pix2tex")
-        if "rapid-latex" in installed:
-            model_store.ensure_rapid_latex_weights()
-            prepared.append("rapid-latex")
-        if text_engine_available():
-            model_store.ensure_tesseract_langs()
-            prepared.append("tesseract")
-        # Nougat is fetched only when its optional package is installed; its
-        # non-commercial weights are never downloaded implicitly otherwise.
-        if nougat_available():
-            model_store.ensure_nougat_model()
-            prepared.append("nougat")
-        return prepared
+        components = [engine] if engine else list(STORAGE_COMPONENTS)
+        return [component for component in components if _fetch_component(component)]
 
     try:
         prepared = await run_in_threadpool(fetch)
+    except HTTPException:
+        raise
     except Exception as exc:
         logger.exception("Model download failed")
         raise HTTPException(

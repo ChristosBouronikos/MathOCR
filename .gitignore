@@ -19,4 +19,3 @@ dist/
 *.spec.bak
 .pyinstaller-cache/
 .build-cache/
-.claude/
